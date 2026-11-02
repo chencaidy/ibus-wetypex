@@ -18,10 +18,10 @@
 
 ## 原版语音资源
 
-正常准备运行时会同时提取原版 VAD 配置和模型，保存到用户数据目录的 `fcitx5-wetypex/voice/vad/`。已有运行时可仅更新资源：
+正常准备运行时会同时提取原版 VAD 配置和模型，保存到用户数据目录的 `wetypex/voice/vad/`。已有运行时可仅更新资源：
 
 ```bash
-fcitx5-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
+wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
 ```
 
 该操作也更新界面图标和微信表情字体。缺少 VAD 文件时仍可手动结束语音；补齐资源后才能使用原版的本地语音检测。原图、模型和原版二进制均不随 WeTypeX 发行。
@@ -39,7 +39,7 @@ fcitx5-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
 查看本地语音状态：
 
 ```bash
-fcitx5-wetypex-voice status
+wetypex-voice status
 ```
 
 `native_ready` 表示原版语音宿主已启动，宿主运行时的 `vad` 表示原版模型已加载；空闲释放宿主后，两者均为 `false`。`capture_backend` 标明使用的录音接口：`pipewire`、`pulse` 或 `ffmpeg-pulse`，已有音频文件转写时为 `file`；`capture_pid` 仅在音频采集进程运行时有值。`timings` 记录采集启动、首个文字结果和停止到最终结果的时间，便于区分设备、建连和识别延迟。
@@ -47,10 +47,10 @@ fcitx5-wetypex-voice status
 也可以转写已有音频文件。此命令会连接原版语音服务：
 
 ```bash
-fcitx5-wetypex-voice transcribe /path/to/recording.wav
+wetypex-voice transcribe /path/to/recording.wav
 ```
 
-添加 `--realtime --verbose` 可按音频实际时长送入并查看中间状态。原来的 `fcitx5-wetypex-account voice-file recording.opus` 也使用同一引擎。
+添加 `--realtime --verbose` 可按音频实际时长送入并查看中间状态。原来的 `wetypex-account voice-file recording.opus` 也使用同一引擎。
 
 日志位于用户状态目录的 `voice/capture.log`、`voice/backend.log` 和 `voice/daemon.log`。状态与日志保存在私有目录中，可能含有识别文本或账户标识；分享排查信息时提供状态、时间字段和脱敏错误即可。
 
@@ -62,4 +62,4 @@ fcitx5-wetypex-voice transcribe /path/to/recording.wav
 
 会话以输入上下文、epoch 和唯一 token 关联。取消、快速松键、控制进程退出或宿主故障都会结束采集；旧会话的中间结果和最终结果会被丢弃。
 
-升级录音辅助程序后，可执行 `fcitx5-wetypex-voice shutdown` 结束旧控制服务；下次启动语音时会运行新版本。
+升级录音辅助程序后，可执行 `wetypex-voice shutdown` 结束旧控制服务；下次启动语音时会运行新版本。

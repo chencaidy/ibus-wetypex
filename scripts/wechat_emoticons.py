@@ -79,7 +79,7 @@ def install_font(archive, data, metadata=None):
     builder.font['sbix'] = sbix
     directory = pathlib.Path(data) / 'fonts'
     directory.mkdir(parents=True, exist_ok=True)
-    target = directory / 'fcitx5-wetypex-wechat.ttf'
+    target = directory / 'wetypex-wechat.ttf'
     fd, temporary = tempfile.mkstemp(prefix='.wetypex-wechat-', dir=directory)
     os.close(fd)
     try:

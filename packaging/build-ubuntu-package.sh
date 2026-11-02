@@ -19,21 +19,21 @@ command -v nfpm >/dev/null 2>&1 || {
     exit 1
 }
 
-mkdir -p "$output/ibus"
-stage=$(mktemp -d "$output/.ibus-stage.XXXXXX")
-manifest=$(mktemp "$output/.nfpm-ibus.XXXXXX.yaml")
+mkdir -p "$output/ubuntu26"
+stage=$(mktemp -d "$output/.stage-ubuntu.XXXXXX")
+manifest=$(mktemp "$output/.nfpm-ubuntu26.XXXXXX.yaml")
 trap 'rm -rf "$stage"; rm -f "$manifest"' EXIT
 
-docker build "${docker_network_args[@]}" -q \
-    -f "$project_root/packaging/docker/ibus.Dockerfile" \
-    -t wetypex-build-ibus "$project_root" >/dev/null
+docker build "${docker_network_args[@]}" \
+    -f "$project_root/packaging/docker/ubuntu26.Dockerfile" \
+    -t wetypex-build-ubuntu26 "$project_root"
 docker run --rm "${docker_network_args[@]}" --user "$(id -u):$(id -g)" \
     -e WETYPEX_BUILD_JOBS="${WETYPEX_BUILD_JOBS:-2}" \
     -v "$project_root:/src:ro" -v "$stage:/out" \
-    wetypex-build-ibus bash /src/packaging/ibus-stage.sh /out/root
+    wetypex-build-ubuntu26 bash /src/packaging/stage-ubuntu.sh /out/root
 
 sed -e "s|@WETYPEX_VERSION@|$version|g" \
     -e "s|@WETYPEX_RELEASE@|$release|g" \
     -e "s|@WETYPEX_STAGE@|$stage/root|g" \
-    "$project_root/packaging/nfpm-ibus.yaml" >"$manifest"
-nfpm package --config "$manifest" --packager deb --target "$output/ibus/"
+    "$project_root/packaging/nfpm-ubuntu26.yaml" >"$manifest"
+nfpm package --config "$manifest" --packager deb --target "$output/ubuntu26/"

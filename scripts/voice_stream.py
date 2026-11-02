@@ -21,11 +21,11 @@ import time
 import uuid
 
 DATA = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
-STATE = Path(os.environ.get('WETYPE_STATE_DIR', DATA / 'fcitx5-wetypex/state'))
+STATE = Path(os.environ.get('WETYPE_STATE_DIR', DATA / 'wetypex/state'))
 VOICE = STATE / 'voice'
-ACCOUNT = Path(os.environ.get('WETYPE_ACCOUNT_STATE_DIR', DATA / 'fcitx5-wetypex/account'))
-RUNTIME = Path(os.environ.get('WETYPE_RUNTIME_DIR', DATA / 'fcitx5-wetypex/runtime'))
-SUPPORT = Path(os.environ.get('WETYPE_SUPPORT_DIR', '/usr/lib/fcitx5-wetypex'))
+ACCOUNT = Path(os.environ.get('WETYPE_ACCOUNT_STATE_DIR', DATA / 'wetypex/account'))
+RUNTIME = Path(os.environ.get('WETYPE_RUNTIME_DIR', DATA / 'wetypex/runtime'))
+SUPPORT = Path(os.environ.get('WETYPE_SUPPORT_DIR', '/usr/lib/ibus-wetypex'))
 CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'fcitx5/wetypex.json'
 ADDRESS = '\0wetypex-voice-{}-{}'.format(os.getuid(), hashlib.sha256(str(STATE.resolve()).encode()).hexdigest()[:20])
 LIMIT = 131072
@@ -178,7 +178,7 @@ class Backend:
                     '--setenv', 'WETYPE_IDENTITY_FILE', '/work/identity.json',
                     '--setenv', 'WETYPE_DEVICE_MODEL', 'LINUX',
                     '--setenv', 'WETYPE_NETWORK_LIVE', '1']
-        vad = Path(os.environ.get('WETYPE_VAD_DIR', DATA / 'fcitx5-wetypex/voice/vad'))
+        vad = Path(os.environ.get('WETYPE_VAD_DIR', DATA / 'wetypex/voice/vad'))
         if vad.is_dir():
             command += ['--ro-bind', str(vad), '/voice-vad', '--setenv', 'WETYPE_VAD_DIR', '/voice-vad']
         command += ['/support/wetypex-engine-host', '/input', 'voice-service']

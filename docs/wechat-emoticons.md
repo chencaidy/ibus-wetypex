@@ -7,10 +7,10 @@
 运行正常的原版资源安装流程即可安装表情。已有运行时可仅更新界面资源：
 
 ```bash
-fcitx5-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
+wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
 ```
 
-安装器沿用原版压缩包 SHA-256 校验，将 PNG 提取到 `$XDG_DATA_HOME/fcitx5-wetypex/ui/wechat-emoticons/`，并在 `$XDG_DATA_HOME/fonts/fcitx5-wetypex-wechat.ttf` 生成彩色字体。未设置 XDG 变量时使用 `~/.local/share`。生成需要 fontTools、Pillow 和 fontconfig，发行包已声明这些依赖。源码环境缺少 fontTools 或 Pillow 时，安装器给出提示，候选仍显示文本名称。
+安装器沿用原版压缩包 SHA-256 校验，将 PNG 提取到 `$XDG_DATA_HOME/wetypex/ui/wechat-emoticons/`，并在 `$XDG_DATA_HOME/fonts/wetypex-wechat.ttf` 生成彩色字体。未设置 XDG 变量时使用 `~/.local/share`。生成需要 fontTools、Pillow 和 fontconfig，发行包已声明这些依赖。源码环境缺少 fontTools 或 Pillow 时，安装器给出提示，候选仍显示文本名称。
 
 Fcitx 的候选文本接口没有图片字段。因此本地字体仅把内部私用码位 `U+10F000–U+10F0FF` 映射到原图，让现有 Classic UI 或支持相同字体的候选界面绘制图片，无需另开抢焦点的窗口。私用字符只用于候选显示，提交使用引擎候选 ID 和文本。图片旁保留名称；字体未就绪时显示名称，不使用相近的 Unicode emoji 代替。
 

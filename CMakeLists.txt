@@ -1,78 +1,74 @@
-cmake_minimum_required(VERSION 3.16)
-project(fcitx5-wetypex VERSION 2.2.3.657 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.22)
+project(ibus-wetypex VERSION 2.2.3.657 LANGUAGES C CXX)
+
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in"
   WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
 string(REGEX REPLACE "^pkgrel=" "" WETYPE_PACKAGE_RELEASE "${WETYPE_PACKAGE_RELEASE_LINE}")
+
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
 endif()
+
 if(POLICY CMP0169)
   cmake_policy(SET CMP0169 OLD)
 endif()
+
 include(GNUInstallDirs)
 include(FetchContent)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-option(WETYPE_BUILD_FCITX5 "Build and install the Fcitx5 frontend" ON)
-option(WETYPE_BUILD_IBUS "Build and install the IBus frontend" OFF)
-if(NOT WETYPE_BUILD_FCITX5 AND NOT WETYPE_BUILD_IBUS)
-  message(FATAL_ERROR "At least one of WETYPE_BUILD_FCITX5 or WETYPE_BUILD_IBUS must be enabled")
-endif()
+
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
-if(WETYPE_BUILD_FCITX5)
-  pkg_check_modules(FONTCONFIG REQUIRED IMPORTED_TARGET fontconfig)
-endif()
-pkg_check_modules(WETYPE_WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 find_package(Threads REQUIRED)
-if(WETYPE_BUILD_FCITX5)
-  find_package(Fcitx5Core 5.0.14 REQUIRED)
-  find_package(Fcitx5Config REQUIRED)
-  find_package(Fcitx5Utils REQUIRED)
-  find_package(Fcitx5ModuleClipboard REQUIRED)
-  find_package(LibIMEPinyin 1.0.11 REQUIRED)
-endif()
+
+pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
+pkg_check_modules(WETYPE_WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
+pkg_check_modules(IBUS REQUIRED IMPORTED_TARGET ibus-1.0)
+pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+pkg_check_modules(ADW REQUIRED IMPORTED_TARGET libadwaita-1>=1.4)
+pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
+
 set(WETYPE_QT_VERSION "AUTO" CACHE STRING "UI toolkit: AUTO, 5 or 6")
 set_property(CACHE WETYPE_QT_VERSION PROPERTY STRINGS AUTO 5 6)
 if(NOT WETYPE_QT_VERSION MATCHES "^(AUTO|5|6)$")
   message(FATAL_ERROR "WETYPE_QT_VERSION must be AUTO, 5 or 6")
 endif()
+
 if(NOT WETYPE_QT_VERSION STREQUAL "5")
   find_package(Qt6 6.2 QUIET COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets)
-  if(WETYPE_BUILD_FCITX5)
-    find_package(Fcitx5Qt6WidgetsAddons QUIET)
-  endif()
-  if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::Svg AND
-     (NOT WETYPE_BUILD_FCITX5 OR TARGET Fcitx5Qt6::WidgetsAddons))
+  if(TARGET Qt6::WebEngineWidgets AND TARGET Qt6::Svg)
     set(WETYPE_QT_PACKAGE Qt6)
     set(WETYPE_UI_QT_MAJOR 6)
   elseif(WETYPE_QT_VERSION STREQUAL "6")
     message(FATAL_ERROR "Qt 6.2+ with WebEngine and the selected frontend development files is required")
   endif()
 endif()
+
 if(NOT WETYPE_QT_PACKAGE)
   find_package(Qt5 5.12 REQUIRED COMPONENTS Widgets Gui DBus Network Svg WebEngineWidgets)
-  if(WETYPE_BUILD_FCITX5)
-    find_package(Fcitx5Qt5WidgetsAddons REQUIRED)
-  endif()
   set(WETYPE_QT_PACKAGE Qt5)
   set(WETYPE_UI_QT_MAJOR 5)
 endif()
+
 set(QT_DEFAULT_MAJOR_VERSION ${WETYPE_UI_QT_MAJOR})
 message(STATUS "WeTypeX UI toolkit: ${WETYPE_QT_PACKAGE}")
-add_executable(fcitx5-wetypex-ai-viewer src/ai/main.cpp)
-target_link_libraries(fcitx5-wetypex-ai-viewer PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::WebEngineWidgets)
-target_compile_definitions(fcitx5-wetypex-ai-viewer PRIVATE
-  WETYPE_AI_HELPER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-ai")
-add_executable(fcitx5-wetypex-transfer src/transfer/main.cpp)
-target_link_libraries(fcitx5-wetypex-transfer PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
-target_compile_definitions(fcitx5-wetypex-transfer PRIVATE
-  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
-  WETYPE_ENGINE_HOST="${CMAKE_INSTALL_FULL_LIBDIR}/fcitx5-wetypex/wetypex-engine-host"
-  WETYPE_SUPPORT_DIR="${CMAKE_INSTALL_FULL_LIBDIR}/fcitx5-wetypex"
-  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-settings")
-add_executable(fcitx5-wetypex-vmode src/vmode.cpp)
-target_link_libraries(fcitx5-wetypex-vmode PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
+
+add_executable(wetypex-ai-viewer src/ai/main.cpp)
+target_link_libraries(wetypex-ai-viewer PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::WebEngineWidgets)
+target_compile_definitions(wetypex-ai-viewer PRIVATE
+  WETYPE_AI_HELPER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-ai")
+
+add_executable(wetypex-transfer src/transfer/main.cpp)
+target_link_libraries(wetypex-transfer PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
+target_compile_definitions(wetypex-transfer PRIVATE
+  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
+  WETYPE_ENGINE_HOST="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}/wetypex-engine-host"
+  WETYPE_SUPPORT_DIR="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}"
+  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings")
+
+add_executable(wetypex-vmode src/vmode.cpp)
+target_link_libraries(wetypex-vmode PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
 set(WETYPE_LAYER_SHELL "AUTO" CACHE STRING "Wayland V toolbar: AUTO, ON or OFF")
 set_property(CACHE WETYPE_LAYER_SHELL PROPERTY STRINGS AUTO ON OFF)
 if(NOT WETYPE_LAYER_SHELL MATCHES "^(AUTO|ON|OFF)$")
@@ -81,8 +77,8 @@ endif()
 if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
   find_package(LayerShellQt ${WETYPE_UI_QT_MAJOR} QUIET)
   if(TARGET LayerShellQt::Interface AND TARGET PkgConfig::WETYPE_WAYLAND)
-    target_link_libraries(fcitx5-wetypex-vmode PRIVATE LayerShellQt::Interface PkgConfig::WETYPE_WAYLAND)
-    target_compile_definitions(fcitx5-wetypex-vmode PRIVATE WETYPE_LAYER_SHELL)
+    target_link_libraries(wetypex-vmode PRIVATE LayerShellQt::Interface PkgConfig::WETYPE_WAYLAND)
+    target_compile_definitions(wetypex-vmode PRIVATE WETYPE_LAYER_SHELL)
     message(STATUS "WeTypeX Wayland V toolbar: layer-shell")
   elseif(WETYPE_LAYER_SHELL STREQUAL "ON")
     message(FATAL_ERROR "LayerShellQt for Qt${WETYPE_UI_QT_MAJOR} and wayland-client are required")
@@ -90,93 +86,58 @@ if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
     message(STATUS "WeTypeX Wayland V toolbar: Fcitx menu fallback (layer-shell unavailable)")
   endif()
 endif()
-add_executable(fcitx5-wetypex-settings src/settings/main.cpp)
-target_link_libraries(fcitx5-wetypex-settings PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::DBus ${WETYPE_QT_PACKAGE}::Network ${WETYPE_QT_PACKAGE}::Svg)
-target_compile_definitions(fcitx5-wetypex-settings PRIVATE
-  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
-  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
-  WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-transfer"
-  WETYPE_VERSION="${PROJECT_VERSION}")
-add_executable(fcitx5-wetypex-clipboard-set src/clipboard/main.cpp)
-target_link_libraries(fcitx5-wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)
-if(WETYPE_BUILD_FCITX5)
-  add_library(wetypex-config-ui MODULE src/configui/main.cpp)
-  set_target_properties(wetypex-config-ui PROPERTIES AUTOMOC TRUE PREFIX "lib"
-    OUTPUT_NAME "wetypexconfig")
-  target_link_libraries(wetypex-config-ui PRIVATE Fcitx5Qt${WETYPE_UI_QT_MAJOR}::WidgetsAddons)
-  target_compile_definitions(wetypex-config-ui PRIVATE
-    WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-settings")
-  foreach(qt_major 5 6)
-    if(NOT qt_major EQUAL WETYPE_UI_QT_MAJOR)
-      find_package(Fcitx5Qt${qt_major}WidgetsAddons QUIET)
-      if(TARGET Fcitx5Qt${qt_major}::WidgetsAddons)
-        add_library(wetypex-config-ui-qt${qt_major} MODULE src/configui/main.cpp)
-        set_target_properties(wetypex-config-ui-qt${qt_major} PROPERTIES AUTOMOC TRUE PREFIX "lib"
-          OUTPUT_NAME "wetypexconfig" LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/qt${qt_major}")
-        target_link_libraries(wetypex-config-ui-qt${qt_major} PRIVATE Fcitx5Qt${qt_major}::WidgetsAddons)
-        target_compile_definitions(wetypex-config-ui-qt${qt_major} PRIVATE
-          WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-settings")
-        install(TARGETS wetypex-config-ui-qt${qt_major} LIBRARY DESTINATION "${FCITX_INSTALL_ADDONDIR}/qt${qt_major}")
-      endif()
-    endif()
-  endforeach()
-endif()
+
+add_executable(wetypex-clipboard-set src/clipboard/main.cpp)
+target_link_libraries(wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)
+
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
   message(FATAL_ERROR "The verified original engine sample requires Linux x86-64")
 endif()
+
 set(ENABLE_TESTING OFF CACHE BOOL "libkqueue tests" FORCE)
 FetchContent_Declare(kqueue
   GIT_REPOSITORY https://github.com/mheily/libkqueue.git
   GIT_TAG 46a3e130f88b0b0742575dcb01d77e336538024b
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(kqueue)
 if(NOT kqueue_POPULATED)
   FetchContent_Populate(kqueue)
   add_subdirectory(${kqueue_SOURCE_DIR} ${kqueue_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
-set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/fcitx5-wetypex")
-if(WETYPE_BUILD_IBUS)
-  pkg_check_modules(IBUS REQUIRED IMPORTED_TARGET ibus-1.0)
-  pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
-  pkg_check_modules(ADW REQUIRED IMPORTED_TARGET libadwaita-1>=1.4)
-  pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
-  add_executable(ibus-engine-wetypex src/ibus/main.cpp)
-  target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
-  target_compile_definitions(ibus-engine-wetypex PRIVATE
-    WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
-    WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-syncd")
-  target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
 
-  add_executable(ibus-wetypex-settings
-    src/ibus-settings/main.cpp
-    src/ibus-settings/settings_store.cpp
-    src/ibus-settings/engine_client.cpp
-    src/ibus-settings/account_client.cpp)
-  target_link_libraries(ibus-wetypex-settings PRIVATE
-    PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
-  target_compile_definitions(ibus-wetypex-settings PRIVATE
-    ADW_VERSION_MIN_REQUIRED=ADW_VERSION_1_4
-    ADW_VERSION_MAX_ALLOWED=ADW_VERSION_1_4
-    GDK_VERSION_MIN_REQUIRED=GDK_VERSION_4_6
-    GDK_VERSION_MAX_ALLOWED=GDK_VERSION_4_6
-    WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
-    WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
-    WETYPE_VERSION="${PROJECT_VERSION}")
-  target_compile_options(ibus-wetypex-settings PRIVATE -Wall -Wextra)
+set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}")
 
-  configure_file(data/ibus-wetypex.xml.in ibus-wetypex.xml @ONLY)
-  configure_file(scripts/ibus-wetypex-setup.sh.in ibus-wetypex-setup @ONLY)
-  configure_file(data/ibus-wetypex-settings.desktop.in
-    ibus-wetypex-settings.desktop @ONLY)
-endif()
+add_executable(ibus-engine-wetypex src/ibus/main.cpp)
+target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
+target_compile_definitions(ibus-engine-wetypex PRIVATE
+  WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
+  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-syncd")
+target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
+
+add_executable(wetypex-settings
+  src/settings/main.cpp
+  src/settings/settings_store.cpp
+  src/settings/engine_client.cpp
+  src/settings/account_client.cpp)
+target_link_libraries(wetypex-settings PRIVATE
+  PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
+target_compile_definitions(wetypex-settings PRIVATE
+  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
+  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
+  WETYPE_VERSION="${PROJECT_VERSION}")
+target_compile_options(wetypex-settings PRIVATE -Wall -Wextra)
+
 add_executable(wetypex-engine-host src/backend/macos_host.cpp)
 add_dependencies(wetypex-engine-host kqueue)
 target_link_libraries(wetypex-engine-host PRIVATE PkgConfig::JSONC Threads::Threads ${CMAKE_DL_LIBS})
 target_compile_options(wetypex-engine-host PRIVATE -Wall -Wextra)
+
 find_program(WETYPE_CLANGXX clang++ REQUIRED)
 if(NOT WETYPE_CLANGXX)
   message(FATAL_ERROR "clang++ is required for the original libc++ ABI")
 endif()
+
 option(WETYPE_BUNDLED_CURL "Embed pinned WebSocket-capable libcurl in the transport bridge" ON)
 if(WETYPE_BUNDLED_CURL)
   include(cmake/BundledCurl.cmake)
@@ -185,12 +146,14 @@ else()
   set(WETYPE_CURL_COMPILE_FLAGS ${CURL_CFLAGS})
   set(WETYPE_CURL_LINK_FLAGS ${CURL_LDFLAGS} -lcurl)
 endif()
+
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so
   COMMAND ${WETYPE_CLANGXX} -std=c++17 -stdlib=libc++ -shared -fPIC -O2
   ${CMAKE_CURRENT_SOURCE_DIR}/src/backend/darwin_locale.cpp -ldl -pthread
   -Wl,-z,relro,-z,now -o ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so
   DEPENDS src/backend/darwin_locale.cpp VERBATIM)
 add_custom_target(wetypex-locale ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so)
+
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wcwss_bridge.so
   COMMAND ${WETYPE_CLANGXX} -std=c++17 -stdlib=libc++ -shared -fPIC -O2
   ${WETYPE_CURL_COMPILE_FLAGS} ${CMAKE_CURRENT_SOURCE_DIR}/src/backend/wcwss_bridge.cpp
@@ -201,92 +164,60 @@ add_custom_target(wetypex-wcwss-bridge ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/w
 if(WETYPE_BUNDLED_CURL)
   add_dependencies(wetypex-wcwss-bridge wetypex-curl)
 endif()
-if(WETYPE_BUILD_FCITX5)
-  add_library(wetypex MODULE src/plugin/wetype.cpp)
-  set_target_properties(wetypex PROPERTIES PREFIX "")
-  if(Fcitx5Core_VERSION VERSION_GREATER_EQUAL "5.1")
-    # Recent Fcitx headers use span/ranges; older stable SDKs work with C++17.
-    set_target_properties(wetypex PROPERTIES CXX_STANDARD 20)
-  endif()
-  target_link_libraries(wetypex PRIVATE Fcitx5::Core Fcitx5::Config Fcitx5::Utils Fcitx5::Module::Clipboard LibIME::Pinyin PkgConfig::JSONC)
-  target_compile_definitions(wetypex PRIVATE WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend")
-  target_compile_definitions(wetypex PRIVATE WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-settings")
-  target_compile_definitions(wetypex PRIVATE WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-syncd")
-  target_compile_definitions(wetypex PRIVATE WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account")
-  target_compile_definitions(wetypex PRIVATE WETYPE_AI="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-ai")
-  target_compile_definitions(wetypex PRIVATE WETYPE_VOICE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-voice")
-  target_compile_definitions(wetypex PRIVATE WETYPE_VMODE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-vmode")
-  target_compile_definitions(wetypex PRIVATE WETYPE_SYMBOLS="${CMAKE_INSTALL_FULL_DATADIR}/fcitx5-wetypex/wetypex-symbols.json")
-  target_compile_definitions(wetypex PRIVATE WETYPE_WECHAT_EMOTICONS="${CMAKE_INSTALL_FULL_DATADIR}/fcitx5-wetypex/wechat-emoticons.json")
-  target_link_libraries(wetypex PRIVATE PkgConfig::FONTCONFIG)
-  target_compile_definitions(wetypex PRIVATE WETYPE_UPDATE="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-update")
-  target_compile_options(wetypex PRIVATE -Wall -Wextra)
-endif()
 
-if(WETYPE_BUILD_FCITX5)
-  configure_file(data/wetypex-addon.conf.in wetypex-addon.conf @ONLY)
-endif()
-configure_file(scripts/fcitx5-wetypex-backend.sh.in fcitx5-wetypex-backend @ONLY)
-configure_file(scripts/fcitx5-wetypex-account.sh.in fcitx5-wetypex-account @ONLY)
-configure_file(scripts/fcitx5-wetypex-sync.sh.in fcitx5-wetypex-sync @ONLY)
-configure_file(scripts/fcitx5-wetypex-syncd.sh.in fcitx5-wetypex-syncd @ONLY)
-configure_file(scripts/fcitx5-wetypex-setup.sh.in fcitx5-wetypex-setup @ONLY)
-configure_file(scripts/fcitx5-wetypex-ai.sh.in fcitx5-wetypex-ai @ONLY)
-configure_file(scripts/fcitx5-wetypex-voice.sh.in fcitx5-wetypex-voice @ONLY)
-configure_file(scripts/fcitx5-wetypex-update.sh.in fcitx5-wetypex-update @ONLY)
-foreach(script backend account sync syncd setup ai voice update)
-  execute_process(COMMAND chmod 755 "${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-${script}"
-    RESULT_VARIABLE chmod_result)
-  if(NOT chmod_result EQUAL 0)
-    message(FATAL_ERROR "Unable to make ${script} executable")
-  endif()
-endforeach()
-if(WETYPE_BUILD_FCITX5)
-  install(TARGETS wetypex LIBRARY DESTINATION "${FCITX_INSTALL_ADDONDIR}")
-  install(TARGETS wetypex-config-ui LIBRARY DESTINATION "${FCITX_INSTALL_ADDONDIR}/qt${WETYPE_UI_QT_MAJOR}")
-endif()
-install(TARGETS wetypex-engine-host RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/fcitx5-wetypex)
-install(TARGETS kqueue LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/fcitx5-wetypex)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/fcitx5-wetypex RENAME locale.so)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wcwss_bridge.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/fcitx5-wetypex)
-if(WETYPE_BUILD_FCITX5)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-addon.conf DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5/addon RENAME wetypex.conf)
-  install(FILES data/wetypex-inputmethod.conf DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5/inputmethod RENAME wetypex.conf)
-endif()
-if(WETYPE_BUILD_IBUS)
-  install(TARGETS ibus-engine-wetypex RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-  install(TARGETS ibus-wetypex-settings RUNTIME DESTINATION bin)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex.xml DESTINATION share/ibus/component)
-  install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex-setup
-    DESTINATION bin)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex-settings.desktop
-    DESTINATION share/applications)
-endif()
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-backend ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-account ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-syncd ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-setup ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/fcitx5-wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(TARGETS fcitx5-wetypex-settings fcitx5-wetypex-clipboard-set fcitx5-wetypex-ai-viewer fcitx5-wetypex-transfer fcitx5-wetypex-vmode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES data/wetypex-symbols.json DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_LIBDIR}/fcitx5-wetypex)
-install(FILES data/hyprland.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-if(WETYPE_BUILD_FCITX5)
-  install(DIRECTORY data/themes/ DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5/themes)
-endif()
-install(FILES data/fcitx5-wetypex-settings.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+configure_file(data/wetypex.xml.in wetypex.xml @ONLY)
+configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
+configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
+configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
+configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
+configure_file(scripts/wetypex-syncd.sh.in wetypex-syncd @ONLY)
+configure_file(scripts/wetypex-update.sh.in wetypex-update @ONLY)
+configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
+configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME} RENAME locale.so)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wcwss_bridge.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
+
+install(TARGETS wetypex-ai-viewer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-clipboard-set RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-settings RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-transfer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-vmode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ibus-engine-wetypex RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+install(TARGETS kqueue LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
+install(TARGETS wetypex-engine-host RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
+
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-syncd DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(PROGRAMS scripts/setup_runtime.py tools/prepare_macos_runtime.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+install(PROGRAMS scripts/wechat_emoticons.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+install(PROGRAMS scripts/voice_stream.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+
 install(DIRECTORY data/icons/hicolor/ DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor)
-install(PROGRAMS scripts/setup_runtime.py tools/prepare_macos_runtime.py DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-install(FILES scripts/wechat_emoticons.py DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-install(FILES scripts/voice_stream.py DESTINATION ${CMAKE_INSTALL_DATADIR}/fcitx5-wetypex)
-install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex RENAME libkqueue-LICENSE)
-install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex RENAME libkqueue-ISC-LICENSE)
-install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex RENAME libkqueue-BSD-2-Clause-LICENSE)
-install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex)
-install(FILES NOTICE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex)
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/fcitx5-wetypex)
-install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/fcitx5-wetypex/docs)
+
+install(FILES data/hyprland.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
+install(FILES data/wetypex-symbols.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+install(FILES data/wetypex-settings.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/ibus/component)
+
+# Install docs and license
+install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME libkqueue-LICENSE)
+install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME libkqueue-ISC-LICENSE)
+install(FILES ${kqueue_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME libkqueue-BSD-2-Clause-LICENSE)
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES NOTICE DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(DIRECTORY docs DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
 set(CPACK_PACKAGE_CONTACT "WeTypeX community project")
 set(CPACK_GENERATOR TXZ)
 include(CPack)

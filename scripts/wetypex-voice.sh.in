@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 export WETYPE_SUPPORT_DIR="${WETYPE_SUPPORT_DIR:-@WETYPE_SUPPORT_DIR@}"
-exec python3 @CMAKE_INSTALL_FULL_DATADIR@/fcitx5-wetypex/voice_stream.py "$@"
+exec python3 @CMAKE_INSTALL_FULL_DATADIR@/@PROJECT_NAME@/voice_stream.py "$@"

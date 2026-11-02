@@ -16,9 +16,9 @@ inline constexpr const char *kAboutComments =
     "\nWeTypeX IBus 输入法设置\n"
     "原版核心及相关商标归其权利人所有";
 inline constexpr const char *kWebsite =
-    "https://github.com/panxuc/fcitx5-wetypex";
+    "https://github.com/chencaidy/ibus-wetypex";
 inline constexpr const char *kIssues =
-    "https://github.com/panxuc/fcitx5-wetypex/issues";
+    "https://github.com/chencaidy/ibus-wetypex/issues";
 
 // ---- 页面标题 ----
 inline constexpr const char *kPageInputTitle = "输入";

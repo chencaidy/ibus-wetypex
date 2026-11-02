@@ -7,21 +7,21 @@
 构建安装后，规则文件位于：
 
 ```text
-/usr/share/fcitx5-wetypex/hyprland.lua
+/usr/share/ibus-wetypex/hyprland.lua
 ```
 
 在 `~/.config/hypr/hyprland.lua` 中显式加载：
 
 ```lua
-require("/usr/share/fcitx5-wetypex/hyprland.lua")
+require("/usr/share/ibus-wetypex/hyprland.lua")
 ```
 
-使用 `/usr/local` 等自定义前缀时，路径相应变为 `/usr/local/share/fcitx5-wetypex/hyprland.lua`。
+使用 `/usr/local` 等自定义前缀时，路径相应变为 `/usr/local/share/ibus-wetypex/hyprland.lua`。
 
 Hyprland 0.55 早期版本如果不接受绝对路径 `require`，可以改用：
 
 ```lua
-dofile("/usr/share/fcitx5-wetypex/hyprland.lua")
+dofile("/usr/share/ibus-wetypex/hyprland.lua")
 ```
 
 `dofile` 会直接在当前 Lua 作用域执行文件；`require` 会为模块建立独立作用域，推荐优先使用。
@@ -34,13 +34,13 @@ dofile("/usr/share/fcitx5-wetypex/hyprland.lua")
 
 | 窗口 | app_id / class | 逻辑尺寸 |
 | --- | --- | --- |
-| 设置 | `fcitx5-wetypex-settings` | 715 × 569 |
-| 隔空传送 | `fcitx5-wetypex-transfer` | 317 × 519 |
-| 问 AI | `fcitx5-wetypex-ai` | 440 × 566 |
+| 设置 | `wetypex-settings` | 715 × 569 |
+| 隔空传送 | `wetypex-transfer` | 317 × 519 |
+| 问 AI | `wetypex-ai` | 440 × 566 |
 
 三条规则都启用了 `float = true` 和 `center = true`。`size` 使用逻辑像素，需要与 Qt 窗口中的初始尺寸保持一致；如果修改了界面尺寸，应同步更新 Lua 文件。
 
-`fcitx5-wetypex-ai-viewer` 可执行文件和 AI 窗口共用同一份源码，app_id 固定为 `fcitx5-wetypex-ai`，因此不需要额外的 viewer 规则。
+`wetypex-ai-viewer` 可执行文件和 AI 窗口共用同一份源码，app_id 固定为 `wetypex-ai`，因此不需要额外的 viewer 规则。
 
 ## 验证
 
@@ -63,7 +63,7 @@ hyprctl configerrors
 
 ```bash
 hyprctl clients -j |
-  jq '.[] | select(.class | test("^fcitx5-wetypex-(settings|transfer|ai)$")) |
+  jq '.[] | select(.class | test("^wetypex-(settings|transfer|ai)$")) |
       {class, floating, size, at, monitor}'
 ```
 
@@ -79,7 +79,7 @@ hyprctl clients -j |
 
 ## V 工具栏
 
-V 工具栏使用 `zwlr_layer_shell_v1`，不是普通 `xdg_toplevel`，因此 `hl.window_rule` 对它无效。它的 layer 命名空间是 `fcitx5-wetypex-vmode`，只应通过 layer rule（而非窗口规则）定制效果。本项目的 Hyprland 规则只负责设置、隔空传送和 AI 窗口，不要尝试用窗口规则移动 V 工具栏。
+V 工具栏使用 `zwlr_layer_shell_v1`，不是普通 `xdg_toplevel`，因此 `hl.window_rule` 对它无效。它的 layer 命名空间是 `wetypex-vmode`，只应通过 layer rule（而非窗口规则）定制效果。本项目的 Hyprland 规则只负责设置、隔空传送和 AI 窗口，不要尝试用窗口规则移动 V 工具栏。
 
 Wayland 下 Fcitx 给出的是相对输入表面的光标矩形，不是全局坐标。Hyprland 上工具栏通过 IPC 读取当前聚焦窗口的 `at`，加上光标矩形并除以缩放系数得到插入点，再按显示器 `reserved` 区域限制在屏幕内；读取失败时退回 `j/cursorpos`。`state/vmode.log` 的 `placement:` 行会记录坐标系来源、锚点、显示器和工作区，便于核对位置。
 
@@ -96,7 +96,7 @@ Hyprland 大量使用 `Super` 作为窗口管理修饰键。WeTypeX 默认语音
 本仓库只维护 0.55+ 的 Lua 规则。旧版本需要使用 hyprlang 配置和 `windowrule`，例如：
 
 ```text
-windowrule = float, class:^(fcitx5-wetypex-settings)$
+windowrule = float, class:^(wetypex-settings)$
 ```
 
 旧格式不由安装包提供，也不应与 0.55+ 的 Lua 配置混用。

@@ -1,14 +1,14 @@
-name: fcitx5-wetypex
+name: ibus-wetypex
 arch: amd64
 platform: linux
 version: "@WETYPEX_VERSION@"
 release: "14"
 section: utils
 priority: optional
-maintainer: WeTypeX contributors <https://github.com/panxuc/fcitx5-wetypex>
-description: WeTypeX native Linux input method for Fcitx5
+maintainer: WeTypeX contributors <https://github.com/chencaidy/ibus-wetypex>
+description: WeTypeX native Linux input method for IBus
 vendor: WeTypeX contributors
-homepage: https://github.com/panxuc/fcitx5-wetypex
+homepage: https://github.com/chencaidy/ibus-wetypex
 license: MIT AND curl AND ISC AND BSD-2-Clause AND Apache-2.0
 scripts:
   postinstall: "@WETYPEX_PROJECT_ROOT@/packaging/post-install.sh"

@@ -15,7 +15,7 @@
 #include <thread>
 
 #ifndef WETYPE_BACKEND
-#define WETYPE_BACKEND "fcitx5-wetypex-backend"
+#define WETYPE_BACKEND "wetypex-backend"
 #endif
 
 namespace ibus_settings {
@@ -24,7 +24,7 @@ namespace {
 constexpr std::size_t kMaxResponse = 1 << 20;
 
 std::string control_socket_path() {
-  gchar *path = g_build_filename(g_get_user_data_dir(), "fcitx5-wetypex",
+  gchar *path = g_build_filename(g_get_user_data_dir(), "wetypex",
                                  "state", "control.sock", nullptr);
   std::string result(path);
   g_free(path);

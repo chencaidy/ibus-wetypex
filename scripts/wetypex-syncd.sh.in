@@ -15,9 +15,9 @@ import time
 import tempfile
 
 data_home = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local/share"))
-state_dir = pathlib.Path(os.environ.get("WETYPE_STATE_DIR", data_home / "fcitx5-wetypex/state"))
-account_tool = os.environ.get("WETYPE_ACCOUNT_TOOL", "@CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-account")
-clipboard_helper = os.environ.get("WETYPE_CLIPBOARD_HELPER", "@CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-clipboard-set")
+state_dir = pathlib.Path(os.environ.get("WETYPE_STATE_DIR", data_home / "wetypex/state"))
+account_tool = os.environ.get("WETYPE_ACCOUNT_TOOL", "@CMAKE_INSTALL_FULL_BINDIR@/wetypex-account")
+clipboard_helper = os.environ.get("WETYPE_CLIPBOARD_HELPER", "@CMAKE_INSTALL_FULL_BINDIR@/wetypex-clipboard-set")
 state_dir.mkdir(parents=True, exist_ok=True)
 state_dir.chmod(0o700)
 lock = open(state_dir / "syncd.lock", "a+")

@@ -11,16 +11,16 @@ cat <<'EOF'
 WeTypeX 已安装。首次使用请依次执行：
 
   1. 准备官方运行时（二选一）：
-     fcitx5-wetypex-setup --download --accept-upstream-license
-     fcitx5-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
+     wetypex-setup --download --accept-upstream-license
+     wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
 
   2. 检查输入核心：
-     fcitx5-wetypex-setup --check
+     wetypex-setup --check
 
-  3. 打开 fcitx5-configtool，将 WeTypeX 添加到当前输入法列表。
+  3. 打开「设置 → 键盘」，将 WeTypeX 添加到当前输入法列表。
 
-  4. 重启 Fcitx5：
-     fcitx5 -rd
+  4. 重启 IBus：
+     ibus restart
 
-完整说明：https://github.com/panxuc/fcitx5-wetypex#首次设置
+完整说明：https://github.com/chencaidy/ibus-wetypex#首次设置
 EOF

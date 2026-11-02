@@ -9,15 +9,15 @@ if [ "${1:-}" = --fetch ]; then
   shift 2
 fi
 question="$*"
-test -n "$question" || { echo 'usage: fcitx5-wetypex-ai QUESTION' >&2; exit 64; }
+test -n "$question" || { echo 'usage: wetypex-ai QUESTION' >&2; exit 64; }
 if [ "$fetch_only" -eq 0 ]; then
-  exec @CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-ai-viewer --ask "$question"
+  exec @CMAKE_INSTALL_FULL_BINDIR@/wetypex-ai-viewer --ask "$question"
 fi
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-runtime="${WETYPE_RUNTIME_DIR:-$data_home/fcitx5-wetypex/runtime}"
-account="${WETYPE_ACCOUNT_STATE_DIR:-$data_home/fcitx5-wetypex/account}"
+runtime="${WETYPE_RUNTIME_DIR:-$data_home/wetypex/runtime}"
+account="${WETYPE_ACCOUNT_STATE_DIR:-$data_home/wetypex/account}"
 support="${WETYPE_SUPPORT_DIR:-@WETYPE_SUPPORT_DIR@}"
-state="${WETYPE_AI_STATE_DIR:-$data_home/fcitx5-wetypex/ai}"
+state="${WETYPE_AI_STATE_DIR:-$data_home/wetypex/ai}"
 identity="$account/identity.json"
 test -f "$runtime/manifest.txt" -a -f "$identity" || { echo 'WeTypeX runtime or paired identity is missing.' >&2; exit 78; }
 mkdir -p "$state/user"

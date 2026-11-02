@@ -2,7 +2,9 @@
 # Keep the private transport self-contained instead of replacing system TLS.
 FetchContent_Declare(wetypex_openssl
   URL https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz
-  URL_HASH SHA256=b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89)
+  URL_HASH SHA256=b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 FetchContent_GetProperties(wetypex_openssl)
 if(NOT wetypex_openssl_POPULATED)
   FetchContent_Populate(wetypex_openssl)
@@ -25,5 +27,4 @@ ExternalProject_Add(wetypex-openssl
   BUILD_BYPRODUCTS "${WETYPE_CURL_OPENSSL_PREFIX}/lib/libssl.a"
                    "${WETYPE_CURL_OPENSSL_PREFIX}/lib/libcrypto.a")
 install(FILES "${wetypex_openssl_SOURCE_DIR}/LICENSE.txt"
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex
-  RENAME openssl-LICENSE.txt)
+  DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME openssl-LICENSE.txt)

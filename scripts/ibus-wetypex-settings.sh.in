@@ -1,2 +1,0 @@
-#!/bin/sh
-exec "@CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-settings" "$@"

@@ -24,7 +24,7 @@ for script in scripts/*.sh.in; do
   sh -n "$script"
 done
 python3 -m py_compile scripts/setup_runtime.py tools/*.py \
-  build/fcitx5-wetypex-syncd build/fcitx5-wetypex-update build/fcitx5-wetypex-sync
+  build/wetypex-syncd build/wetypex-update build/wetypex-sync
 ```
 
 Pull Request 应描述最终行为、适用环境、实际执行过的检查以及仍存在的限制。

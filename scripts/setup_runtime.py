@@ -43,7 +43,7 @@ def install_ui_resources(archive, data):
                                'devices':'icon_setup_multi_device.svg',
                                'mobile':'icon_setup_sidebar_phone_entry.svg',
                                'about':'icon_setup_sidebar_about.svg'}.items():
-            assets['fcitx5-wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+original
+            assets['wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+original
         for target, original in {
             'ai-logo-light.svg':'icon_ai_logo_light.svg',
             'ai-polish.svg':'icon_toolbox_polish.svg',
@@ -51,7 +51,7 @@ def install_ui_resources(archive, data):
             'ai-scroll-down.svg':'icon_ai_scroll_down.svg',
             'ai-copy-image.svg':'icon_ai_copy_image.svg',
         }.items():
-            assets['fcitx5-wetypex/ui/ai-icons/'+target]=prefix+'common/icons/'+original
+            assets['wetypex/ui/ai-icons/'+target]=prefix+'common/icons/'+original
         chrome='WeType.app/Contents/MacOS/WeTypeSettings.app/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/packages/window_manager/images/'
         for target, original in {
             'chrome-minimize.png':'ic_chrome_minimize.png',
@@ -59,7 +59,7 @@ def install_ui_resources(archive, data):
             'chrome-unmaximize.png':'ic_chrome_unmaximize.png',
             'chrome-close.png':'ic_chrome_close.png',
         }.items():
-            assets['fcitx5-wetypex/ui/ai-icons/'+target]=chrome+original
+            assets['wetypex/ui/ai-icons/'+target]=chrome+original
         for name in ('icon_menu_chinese','icon_menu_punctuation','icon_menu_half',
                      'icon_menu_speechvoice','icon_menu_transmission',
                      'icon_menu_translation','icon_menu_ai','icon_menu_clipboard',
@@ -67,14 +67,14 @@ def install_ui_resources(archive, data):
                      'icon_transfer_copy',
                      'icon_transfer_glossary','icon_transfer_common',
                      'icon_transfer_filetransfer','icon_entry_ios','icon_entry_android'):
-            assets['fcitx5-wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+name+'.svg'
+            assets['wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+name+'.svg'
         for name in ('icon_speech','icon_time','icon_many','icon_about_arrow',
                      'icon_delete_key','icon_windows_close_btn','icon_tips_backslash','icon_left','icon_right',
                      'icon_sync_device','icon_tips_%5B','icon_tips_%5D',
                      'icon_tips_%E3%80%82','icon_tips_%EF%BC%8C',
                      'icon_tips_;','icon_tips_shift+tab_windows',
                      'icon_tips_tab_windows'):
-            assets['fcitx5-wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+name+'.svg'
+            assets['wetypex/ui/icons/'+name+'.svg']=prefix+'setting/icons/'+name+'.svg'
         for name in ('side_bar_background_light.png','entry_phone_light.png',
                      'icon_computer_default_light.png','icon_iphone_default_light.png',
                      'icon_Android_default_light.png','hotword_guide.gif',
@@ -84,10 +84,10 @@ def install_ui_resources(archive, data):
                      'icon_candidate_gif_choose.png','icon_candidate_gif_close.png',
                      'icon_candidate_kaomoji_choose.png','icon_candidate_kaomoji_close.png',
                      'phone_ios_download.png','phone_android_download.png'):
-            assets['fcitx5-wetypex/ui/images/'+name]=prefix+'setting/images/'+name
+            assets['wetypex/ui/images/'+name]=prefix+'setting/images/'+name
         for name in ('icon_transfer_computer_mini.png','icon_transfer_ios_mini.png',
                      'icon_transfer_android_mini.png','icon_button_connect.png'):
-            assets['fcitx5-wetypex/ui/images/'+name]=prefix+'setting/icons/'+name
+            assets['wetypex/ui/images/'+name]=prefix+'setting/icons/'+name
         candidate=prefix+'candidate/icons/'
         for theme,variant in (('wetypex-light','light'),
                               ('wetypex-dark','dark')):
@@ -103,7 +103,7 @@ def install_ui_resources(archive, data):
                      'icon_symboltab_shuxue','icon_symboltab_teshu',
                      'icon_symboltab_xiwen','icon_symboltab_riwen',
                      'icon_symboltab_zhongwen','icon_symboltab_zhuyin'):
-            assets['fcitx5-wetypex/ui/candidate-icons/'+name+'.svg']=candidate+name+'.svg'
+            assets['wetypex/ui/candidate-icons/'+name+'.svg']=candidate+name+'.svg'
         transfer=prefix+'file_transfer/'
         for name in ('logo_green','icon_transmission_send','icon_transmission_others',
                      'icon_transmission_arrow','icon_transmission_equipment',
@@ -113,10 +113,10 @@ def install_ui_resources(archive, data):
                      'icon_filetype_video','icon_filetype_music','icon_filetype_pdf',
                      'icon_filetype_doc','icon_filetype_excel','icon_filetype_ppt',
                      'icon_filetype_txt','icon_filetype_json','icon_filetype_zip'):
-            assets['fcitx5-wetypex/ui/transfer-icons/'+name+'.svg']=transfer+'icons/'+name+'.svg'
+            assets['wetypex/ui/transfer-icons/'+name+'.svg']=transfer+'icons/'+name+'.svg'
         for name in ('img_connection_pc_to_phone.png','img_connection_pc_to_pc.png',
                      'img_connection_pc_to_phone_dark.png','img_connection_pc_to_pc_dark.png'):
-            assets['fcitx5-wetypex/ui/transfer-images/'+name]=transfer+'images/'+name
+            assets['wetypex/ui/transfer-images/'+name]=transfer+'images/'+name
         for relative, member in assets.items():
             path=data/relative;path.parent.mkdir(parents=True,exist_ok=True)
             temporary=path.with_suffix(path.suffix+'.tmp');temporary.write_bytes(z.read(member));temporary.replace(path)
@@ -125,7 +125,7 @@ def install_ui_resources(archive, data):
             if member.startswith(candidate_images) and member.endswith('.png'):
                 name=member[len(prefix+'candidate/icons/'):]
                 if pathlib.PurePosixPath(name).name!=name:continue
-                path=data/'fcitx5-wetypex/ui/wechat-emoticons'/name
+                path=data/'wetypex/ui/wechat-emoticons'/name
                 path.parent.mkdir(parents=True,exist_ok=True)
                 temporary=path.with_suffix('.png.tmp')
                 temporary.write_bytes(z.read(member));temporary.replace(path)
@@ -138,7 +138,7 @@ def install_ui_resources(archive, data):
         print('Install fontTools and Pillow to render original WeChat emoticons; text labels remain available.',file=sys.stderr)
 
 def install_voice_resources(archive, data):
-    directory=data/'fcitx5-wetypex/voice/vad'
+    directory=data/'wetypex/voice/vad'
     directory.mkdir(parents=True,exist_ok=True)
     prefix='WeType.app/Contents/Resources/vad/'
     with zipfile.ZipFile(archive) as source:
@@ -159,7 +159,7 @@ def digest(path):
     with path.open('rb') as stream:return stream_digest(stream,'sha256')
 
 def validate_runtime(target):
-    support=pathlib.Path(os.environ.get('WETYPE_SUPPORT_DIR','/usr/lib/fcitx5-wetypex'))
+    support=pathlib.Path(os.environ.get('WETYPE_SUPPORT_DIR','/usr/lib/ibus-wetypex'))
     host=support/'wetypex-engine-host'
     locale=support/'locale.so'
     if not locale.exists():locale=support/'wetypex-locale.so'
@@ -242,14 +242,14 @@ def main():
     ap.add_argument('--runtime-dir',type=pathlib.Path)
     args=ap.parse_args()
     data=pathlib.Path(os.environ.get('XDG_DATA_HOME',str(pathlib.Path.home()/'.local/share')))
-    target=args.runtime_dir or pathlib.Path(os.environ.get('WETYPE_RUNTIME_DIR',str(data/'fcitx5-wetypex/runtime')))
+    target=args.runtime_dir or pathlib.Path(os.environ.get('WETYPE_RUNTIME_DIR',str(data/'wetypex/runtime')))
     if platform.system()!='Linux' or platform.machine()!='x86_64':ap.error('WeTypeX supports Linux x86-64 only')
     if args.check:
         required=['image.macho','manifest.txt','symbols.txt','dicts.txt','resources/index.json','runtime.json',
                   'flurry/image.macho','flurry/manifest.txt',
                   'wxp2p/image.macho','wxp2p/manifest.txt']
         missing=[name for name in required if not (target/name).is_file()]
-        ui=data/'fcitx5-wetypex/ui'
+        ui=data/'wetypex/ui'
         ui_required=['icons/input.svg','icons/icon_windows_close_btn.svg',
                      'icons/voice.svg','icons/phrases.svg','icons/appearance.svg',
                      'icons/shortcuts.svg','icons/devices.svg','icons/mobile.svg',
@@ -309,7 +309,7 @@ def main():
         install_ui_resources(archive,data)
         install_voice_resources(archive,data)
         if args.icons_only:
-            print('Original UI assets installed in '+str(data/'fcitx5-wetypex/ui'))
+            print('Original UI assets installed in '+str(data/'wetypex/ui'))
             return 0
         runtime=temp/'runtime';runtime.mkdir();resources=runtime/'resources';resources.mkdir()
         original=temp/'WeType'

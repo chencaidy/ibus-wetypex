@@ -10,7 +10,7 @@ import time
 
 def main():
     if sys.argv[1:] not in ([], ["--refresh-state"]):
-        raise ValueError("用法: fcitx5-wetypex-sync [--refresh-state]")
+        raise ValueError("用法: wetypex-sync [--refresh-state]")
     refresh_state = sys.argv[1:] == ["--refresh-state"]
     config_home = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home()/".config")
     try:
@@ -20,12 +20,12 @@ def main():
     if isinstance(config, dict) and config.get("standalone", False):
         raise ValueError("单机模式已开启，请关闭后再请求同步")
     data = pathlib.Path(os.environ.get("XDG_DATA_HOME") or pathlib.Path.home()/".local/share")
-    state = pathlib.Path(os.environ.get("WETYPE_STATE_DIR") or data/"fcitx5-wetypex/state")
+    state = pathlib.Path(os.environ.get("WETYPE_STATE_DIR") or data/"wetypex/state")
     try:
         cursor = int(json.loads((state/"sync-runtime.json").read_text()).get("remote_version", 0))
     except (OSError, ValueError, TypeError, AttributeError):
         cursor = 0
-    tool = os.environ.get("WETYPE_ACCOUNT_TOOL") or "@CMAKE_INSTALL_FULL_BINDIR@/fcitx5-wetypex-account"
+    tool = os.environ.get("WETYPE_ACCOUNT_TOOL") or "@CMAKE_INSTALL_FULL_BINDIR@/wetypex-account"
     result = subprocess.run([tool, "group-info", str(max(0, cursor))], capture_output=True, text=True, timeout=35)
     group = json.loads(result.stdout) if result.stdout else {}
     if result.returncode or not isinstance(group, dict) or not group.get("ok"):

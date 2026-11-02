@@ -6,7 +6,7 @@
 #include <memory>
 
 #ifndef WETYPE_ACCOUNT_TOOL
-#define WETYPE_ACCOUNT_TOOL "fcitx5-wetypex-account"
+#define WETYPE_ACCOUNT_TOOL "wetypex-account"
 #endif
 
 namespace ibus_settings {

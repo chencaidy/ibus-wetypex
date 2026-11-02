@@ -3,6 +3,7 @@ set(WETYPE_CURL_VERSION "8.22.0")
 FetchContent_Declare(wetypex_curl
   URL "https://curl.se/download/curl-${WETYPE_CURL_VERSION}.tar.xz"
   URL_HASH SHA256=f7ef3ae8a22e521f289803fe93543eb64c329b58aa73a9e224dfd915a2a5f4f7
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(wetypex_curl)
 if(NOT wetypex_curl_POPULATED)
@@ -92,4 +93,4 @@ set(WETYPE_CURL_LINK_FLAGS "${WETYPE_CURL_LIBRARY}"
   "${WETYPE_CURL_SSL_LIBRARY}" "${WETYPE_CURL_CRYPTO_LIBRARY}" -ldl
   -Wl,--exclude-libs,ALL)
 install(FILES "${wetypex_curl_SOURCE_DIR}/COPYING"
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/fcitx5-wetypex RENAME curl-COPYING)
+  DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME curl-COPYING)

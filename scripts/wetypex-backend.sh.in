@@ -1,12 +1,12 @@
 #!/bin/sh
 set -eu
 umask 077
-runtime="${WETYPE_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5-wetypex/runtime}"
-state="${WETYPE_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5-wetypex/state}"
-account="${WETYPE_ACCOUNT_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fcitx5-wetypex/account}"
+runtime="${WETYPE_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/wetypex/runtime}"
+state="${WETYPE_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/wetypex/state}"
+account="${WETYPE_ACCOUNT_STATE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/wetypex/account}"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 support="${WETYPE_SUPPORT_DIR:-@WETYPE_SUPPORT_DIR@}"
-test -f "$runtime/manifest.txt" || { echo 'Run fcitx5-wetypex-setup first.' >&2; exit 78; }
+test -f "$runtime/manifest.txt" || { echo 'Run wetypex-setup first.' >&2; exit 78; }
 mkdir -p "$state/user"
 chmod 700 "$state"
 exec 9>"$state/backend.lock"

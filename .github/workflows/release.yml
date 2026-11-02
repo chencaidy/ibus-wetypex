@@ -58,7 +58,7 @@ jobs:
       - name: 构建 Ubuntu 26.04 IBus 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-ibus-package.sh
+        run: bash packaging/build-ubuntu-package.sh
 
       - name: 生成源码包与 Arch 构建文件
         run: python3 tools/package_release.py
@@ -70,14 +70,14 @@ jobs:
             -e CMAKE_BUILD_PARALLEL_LEVEL=2 \
             -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
             archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++ \
+              pacman -Syu --noconfirm git cmake clang boost ibus libadwaita libc++ \
                 json-c curl bubblewrap util-linux python python-fonttools python-pillow fontconfig qt6-base qt6-svg \
                 qt6-webengine layer-shell-qt pipewire ffmpeg wl-clipboard libnotify polkit
               useradd -m builder
               cp -a /src/dist/arch /tmp/arch
               chown -R builder:builder /tmp/arch
               su builder -c "cd /tmp/arch && makepkg -C -f --noconfirm"
-              cp /tmp/arch/fcitx5-wetypex-[0-9]*-x86_64.pkg.tar.zst /out/arch/
+              cp /tmp/arch/ibus-wetypex-[0-9]*-x86_64.pkg.tar.zst /out/arch/
             '
 
       - name: 生成便携归档与校验和
@@ -85,35 +85,34 @@ jobs:
         run: |
           version=${RELEASE_TAG#v}
           tar --zstd -C dist/debian-root -cf \
-            "dist/fcitx5-wetypex-${version}-linux-x86_64.tar.zst" .
+            "dist/ibus-wetypex-${version}-linux-x86_64.tar.zst" .
           (
             cd dist
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
             done < <(find arch debian fedora ubuntu20 ibus . -maxdepth 1 -type f \
-              \( -name 'fcitx5-wetypex-*.tar.gz' -o \
-                 -name 'fcitx5-wetypex-*.tar.zst' -o \
-                 -name 'fcitx5-wetypex-*.rpm' -o \
-                 -name 'fcitx5-wetypex_*.deb' -o \
-                 -name 'fcitx5-wetypex-legacy_*.deb' -o \
+              \( -name 'ibus-wetypex-*.tar.gz' -o \
+                 -name 'ibus-wetypex-*.tar.zst' -o \
+                 -name 'ibus-wetypex-*.rpm' -o \
                  -name 'ibus-wetypex_*.deb' -o \
-                 -name 'fcitx5-wetypex-*.pkg.tar.zst' \) \
+                 -name 'ibus-wetypex-legacy_*.deb' -o \
+                 -name 'ibus-wetypex-*.pkg.tar.zst' \) \
               -print0 | sort -z)
           ) > dist/SHA256SUMS
 
       - name: 保存构建产物
         uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-wetypex-${{ inputs.tag || github.ref_name }}
+          name: ibus-wetypex-${{ inputs.tag || github.ref_name }}
           path: |
-            dist/arch/fcitx5-wetypex-*.pkg.tar.zst
-            dist/arch/fcitx5-wetypex-*.tar.gz
-            dist/debian/fcitx5-wetypex_*.deb
+            dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/arch/ibus-wetypex-*.tar.gz
+            dist/debian/ibus-wetypex_*.deb
             dist/ibus/ibus-wetypex_*.deb
-            dist/ubuntu20/fcitx5-wetypex-legacy_*.deb
-            dist/fedora/fcitx5-wetypex-*.rpm
-            dist/fcitx5-wetypex-*-linux-x86_64.tar.zst
+            dist/ubuntu20/ibus-wetypex-legacy_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
+            dist/ibus-wetypex-*-linux-x86_64.tar.zst
             dist/SHA256SUMS
 
       - name: 创建 GitHub Release
@@ -122,13 +121,13 @@ jobs:
         shell: bash
         run: |
           files=(
-            dist/arch/fcitx5-wetypex-*.pkg.tar.zst
-            dist/arch/fcitx5-wetypex-*.tar.gz
-            dist/debian/fcitx5-wetypex_*.deb
+            dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/arch/ibus-wetypex-*.tar.gz
+            dist/debian/ibus-wetypex_*.deb
             dist/ibus/ibus-wetypex_*.deb
-            dist/ubuntu20/fcitx5-wetypex-legacy_*.deb
-            dist/fedora/fcitx5-wetypex-*.rpm
-            dist/fcitx5-wetypex-*-linux-x86_64.tar.zst
+            dist/ubuntu20/ibus-wetypex-legacy_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
+            dist/ibus-wetypex-*-linux-x86_64.tar.zst
             dist/SHA256SUMS
           )
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -171,25 +170,25 @@ jobs:
             RELEASE_TAG="$RELEASE_TAG" \
             GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
             bash -lc '
-              git clone ssh://aur@aur.archlinux.org/fcitx5-wetypex.git "$HOME/aur"
+              git clone ssh://aur@aur.archlinux.org/ibus-wetypex.git "$HOME/aur"
               cp "$1/packaging/aur/PKGBUILD" \
-                 "$1/packaging/aur/fcitx5-wetypex.install" "$HOME/aur/"
+                 "$1/packaging/aur/ibus-wetypex.install" "$HOME/aur/"
               cd "$HOME/aur"
               version=$(sed -n "s/^project([^ ]* VERSION \([^ ]*\).*/\1/p" "$1/CMakeLists.txt")
               pkgrel=$(sed -n "s/^pkgrel=//p" "$1/packaging/PKGBUILD.in")
               sed -i "s/^pkgver=.*/pkgver=$version/" PKGBUILD
               sed -i "s/^pkgrel=.*/pkgrel=$pkgrel/" PKGBUILD
-              source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/fcitx5-wetypex-${version}.tar.gz"
+              source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/ibus-wetypex-${version}.tar.gz"
               digest="$(curl -fsSL "$source_url" | sha256sum | cut -d" " -f1)"
               sed -i "s/^sha256sums=(\"SKIP\" /sha256sums=(\"$digest\" /" PKGBUILD
               makepkg --printsrcinfo > .SRCINFO
               git config user.name wetypex-release-bot
               git config user.email actions@users.noreply.github.com
-              git add PKGBUILD fcitx5-wetypex.install .SRCINFO
+              git add PKGBUILD ibus-wetypex.install .SRCINFO
               if git diff --cached --quiet; then
                 echo "AUR metadata is already current"
                 exit 0
               fi
-              git commit -m "fcitx5-wetypex $version-$pkgrel"
+              git commit -m "ibus-wetypex $version-$pkgrel"
               git push
             ' _ "$GITHUB_WORKSPACE"

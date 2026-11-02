@@ -18,7 +18,7 @@ CURRENT_VERSION = "@PROJECT_VERSION@"
 CURRENT_PACKAGE_RELEASE = "@WETYPE_PACKAGE_RELEASE@"
 RELEASE_API = os.environ.get(
     "WETYPE_UPDATE_API",
-    "https://api.github.com/repos/panxuc/fcitx5-wetypex/releases/latest",
+    "https://api.github.com/repos/chencaidy/ibus-wetypex/releases/latest",
 )
 CHECK_INTERVAL = 24 * 60 * 60
 RETRY_INTERVAL = 60 * 60
@@ -77,9 +77,9 @@ def linux_family():
 
 def select_asset(assets, family):
     patterns = {
-        "arch": re.compile(r"^fcitx5-wetypex-[^-]+-\d+-x86_64\.pkg\.tar\.zst$"),
-        "debian": re.compile(r"^fcitx5-wetypex_[^_]+_amd64\.deb$"),
-        "fedora": re.compile(r"^fcitx5-wetypex-[^-]+-\d+\.x86_64\.rpm$"),
+        "arch": re.compile(r"^ibus-wetypex-[^-]+-\d+-x86_64\.pkg\.tar\.zst$"),
+        "debian": re.compile(r"^ibus-wetypex_[^_]+_amd64\.deb$"),
+        "fedora": re.compile(r"^ibus-wetypex-[^-]+-\d+\.x86_64\.rpm$"),
     }
     pattern = patterns.get(family)
     if family == "debian":
@@ -88,7 +88,7 @@ def select_asset(assets, family):
         except (OSError, ValueError, AttributeError):
             glibc = ()
         if glibc and glibc < (2, 35):
-            pattern = re.compile(r"^fcitx5-wetypex-legacy_[^_]+_amd64\.deb$")
+            pattern = re.compile(r"^ibus-wetypex-legacy_[^_]+_amd64\.deb$")
     if not pattern:
         return None
     return next(
@@ -111,7 +111,7 @@ def notify_and_offer_install(package, version, family):
     command = [
         notify,
         "--app-name=WeTypeX",
-        "--icon=fcitx5-wetypex",
+        "--icon=wetypex",
     ]
     if actions:
         command += ["--action=install=安装更新"]
@@ -142,7 +142,7 @@ def main():
         os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")
     )
     root = pathlib.Path(
-        os.environ.get("WETYPE_UPDATE_DIR", cache_home / "fcitx5-wetypex/updates")
+        os.environ.get("WETYPE_UPDATE_DIR", cache_home / "wetypex/updates")
     )
     root.mkdir(parents=True, exist_ok=True)
     root.chmod(0o700)

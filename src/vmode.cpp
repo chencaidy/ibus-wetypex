@@ -103,12 +103,12 @@ static QString stateDir() {
   const auto override = qEnvironmentVariable("WETYPE_STATE_DIR");
   return override.isEmpty() ? QStandardPaths::writableLocation(
                                   QStandardPaths::GenericDataLocation) +
-                                  "/fcitx5-wetypex/state"
+                                  "/wetypex/state"
                             : override;
 }
 static QString candidateIcon(const QString &name) {
   return QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                "fcitx5-wetypex/ui/candidate-icons/" + name +
+                                "wetypex/ui/candidate-icons/" + name +
                                     ".svg");
 }
 struct VPlacement {
@@ -377,8 +377,8 @@ int main(int argc, char **argv) {
   if (wayland && !layerShell)
     return 69;
   QApplication app(argc, argv);
-  app.setApplicationName("fcitx5-wetypex-vmode");
-  app.setDesktopFileName(QStringLiteral("fcitx5-wetypex-vmode"));
+  app.setApplicationName("wetypex-vmode");
+  app.setDesktopFileName(QStringLiteral("wetypex-vmode"));
   std::fprintf(stderr, "WeTypeX V toolbar: %s%s\n",
                app.platformName().toUtf8().constData(),
                layerShell ? " / layer-shell, keyboard focus disabled" : "");
@@ -441,7 +441,7 @@ int main(int argc, char **argv) {
       return 69;
     window.windowHandle()->setScreen(screen);
     auto *surface = LayerShellQt::Window::get(window.windowHandle());
-    surface->setScope(QStringLiteral("fcitx5-wetypex-vmode"));
+    surface->setScope(QStringLiteral("wetypex-vmode"));
     surface->setLayer(LayerShellQt::Window::LayerOverlay);
     surface->setKeyboardInteractivity(
         LayerShellQt::Window::KeyboardInteractivityNone);
@@ -530,7 +530,7 @@ int main(int argc, char **argv) {
   QObject::connect(symbols, &QPushButton::clicked, &window, [&] {
     clearLayout(root);
     QFile file(QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                      "fcitx5-wetypex/wetypex-symbols.json"));
+                                      "ibus-wetypex/wetypex-symbols.json"));
     if (!file.open(QIODevice::ReadOnly))
       return;
     auto *tabs = new QTabWidget;

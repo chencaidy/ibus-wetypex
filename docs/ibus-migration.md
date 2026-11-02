@@ -25,7 +25,7 @@
 src/plugin/wetype.cpp
   │ 私有 JSON 行协议
   ▼
-fcitx5-wetypex-backend → wetypex-engine-host → 原版输入核心
+wetypex-backend → wetypex-engine-host → 原版输入核心
 ```
 
 ### 可以继续复用
@@ -74,13 +74,13 @@ fcitx5-wetypex-backend → wetypex-engine-host → 原版输入核心
 
 ### 4. 发行版和升级路径
 
-[`CMakeLists.txt`](../CMakeLists.txt) 直接查找 Fcitx5、Fcitx5 配置组件、剪贴板模块和 Fcitx5 Qt Addons，并把插件与输入法描述文件安装到 Fcitx5 目录。Arch、Debian/RPM、Nix、Ubuntu 20.04 SDK 构建和 GitHub Actions 也分别声明了 Fcitx5 依赖、插件路径或输出包名。
+[`CMakeLists.txt`](../CMakeLists.txt) 直接查找 Fcitx5、Fcitx5 配置组件、剪贴板模块和 Fcitx5 Qt Addons，并把插件与输入法描述文件安装到 Fcitx5 目录。Arch、Debian/RPM、Ubuntu 20.04 SDK 构建和 GitHub Actions 也分别声明了 Fcitx5 依赖、插件路径或输出包名。
 
 迁移会涉及至少以下工作面：
 
 - CMake 依赖发现、目标与安装规则；新增 IBus 开发依赖和 IBus component/engine 安装元数据。
 - 包依赖、包名/描述、卸载与升级行为、运行时命令和首次设置提示。
-- Nix 包表达式与模块文档、Ubuntu 旧系统构建镜像、发行流水线和包产物检查。
+- Ubuntu 旧系统构建镜像、发行流水线和包产物检查。
 - README、安装说明、配置/故障排查文档和桌面输入法添加说明。
 
 只替换 C++ 插件而不改这些入口，无法得到可安装、可发现或可升级的 IBus 输入法。
@@ -96,7 +96,7 @@ fcitx5-wetypex-backend → wetypex-engine-host → 原版输入核心
 
 ## 方案 A 落地状态
 
-已按方案 A 开始实现：Fcitx5 仍为默认构建前端；IBus 使用独立引擎和单独的 `ibus-wetypex` Debian 包，不要求安装 Fcitx5。CMake 可通过 `WETYPE_BUILD_FCITX5` 与 `WETYPE_BUILD_IBUS` 分别选择前端。Ubuntu 26.04 的独立包构建入口为 `packaging/build-ibus-package.sh`。
+已按方案 A 开始实现：Fcitx5 仍为默认构建前端；IBus 使用独立引擎和单独的 `ibus-wetypex` Debian 包，不要求安装 Fcitx5。CMake 可通过 `WETYPE_BUILD_FCITX5` 与 `WETYPE_BUILD_IBUS` 分别选择前端。Ubuntu 26.04 的独立包构建入口为 `packaging/build-ubuntu-package.sh`。
 
 IBus 首版范围为全拼、双拼、五笔、预编辑/候选交互，以及沿用现有用户配置和远程剪贴板同步。AI、语音、V 模式和剪贴板历史不由此版 IBus 前端提供。后端和已有业务工具仍共享项目现有路径与数据；两个前端不应同时编辑同一份配置。
 
@@ -140,7 +140,7 @@ IBus 首版范围为全拼、双拼、五笔、预编辑/候选交互，以及�
 ### 阶段 3：打包与发布
 
 - 增加 IBus 运行时/开发包依赖、引擎元数据、安装位置和包完整性检查。
-- 更新 Arch、Debian/RPM、Nix 与旧版 Ubuntu 构建，以及 GitHub Actions 发布产物。
+- 更新 Arch、Debian/RPM 与旧版 Ubuntu 构建，以及 GitHub Actions 发布产物。
 - 决定采用单包双引擎还是独立 IBus 包，明确与现有 Fcitx5 包的冲突关系和升级方式。
 
 **验收：** 从干净系统安装、发现并启用引擎；升级不覆盖/删除用户数据；卸载行为符合包管理器约定；发布包测试能发现 IBus 引擎及其元数据。

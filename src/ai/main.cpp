@@ -29,7 +29,7 @@ namespace {
 QString asset(const char *name) {
   return QStandardPaths::locate(
       QStandardPaths::GenericDataLocation,
-      QStringLiteral("fcitx5-wetypex/ui/ai-icons/") +
+      QStringLiteral("wetypex/ui/ai-icons/") +
           QString::fromLatin1(name));
 }
 
@@ -114,7 +114,7 @@ public:
   explicit AiWindow(const QString &initialResponse, const QString &initialQuery,
                     const QString &initialAsk) {
     setWindowFlag(Qt::FramelessWindowHint);
-    setWindowIcon(QIcon::fromTheme(QStringLiteral("fcitx5-wetypex")));
+    setWindowIcon(QIcon::fromTheme(QStringLiteral("wetypex")));
     setWindowTitle(QStringLiteral("问Ai"));
     resize(440, 566);
     setMinimumSize(352, 453);
@@ -308,7 +308,7 @@ private:
       return;
     const QString displayedQuestion = question;
     auto requestDir = std::make_shared<QTemporaryDir>(
-        QDir::tempPath() + QStringLiteral("/fcitx5-wetypex-ai-XXXXXX"));
+        QDir::tempPath() + QStringLiteral("/wetypex-ai-XXXXXX"));
     if (!requestDir->isValid()) {
       response_->setHtml(
           statusPage(displayedQuestion,
@@ -377,8 +377,8 @@ int main(int argc, char **argv) {
   }
   qputenv("QTWEBENGINE_CHROMIUM_FLAGS", webEngineFlags);
   QApplication app(argc, argv);
-  app.setApplicationName(QStringLiteral("fcitx5-wetypex-ai"));
-  app.setDesktopFileName(QStringLiteral("fcitx5-wetypex-ai"));
+  app.setApplicationName(QStringLiteral("wetypex-ai"));
+  app.setDesktopFileName(QStringLiteral("wetypex-ai"));
   QString initialResponse;
   QString initialQuery;
   QString initialAsk;

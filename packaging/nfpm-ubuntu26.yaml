@@ -5,10 +5,10 @@ version: "@WETYPEX_VERSION@"
 release: "@WETYPEX_RELEASE@"
 section: utils
 priority: optional
-maintainer: WeTypeX contributors <https://github.com/panxuc/fcitx5-wetypex>
+maintainer: WeTypeX contributors <https://github.com/chencaidy/ibus-wetypex>
 description: WeTypeX native Linux input method for IBus
 vendor: WeTypeX contributors
-homepage: https://github.com/panxuc/fcitx5-wetypex
+homepage: https://github.com/chencaidy/ibus-wetypex
 license: MIT AND curl AND ISC AND BSD-2-Clause AND Apache-2.0
 contents:
   - src: "@WETYPEX_STAGE@/"

@@ -6,34 +6,13 @@ on:
   pull_request:
 
 jobs:
-  nix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-            max-jobs = 2
-            cores = 2
-      - name: 检查 flake 并构建 Nix 包
-        run: |
-          nix flake check --no-write-lock-file --print-build-logs
-      - name: 检查源码包中的 Nix 入口
-        run: |
-          python3 tools/package_release.py
-          mkdir -p "$RUNNER_TEMP/wetypex-source"
-          tar -xzf dist/arch/fcitx5-wetypex-*.tar.gz -C "$RUNNER_TEMP/wetypex-source"
-          source_dir=$(find "$RUNNER_TEMP/wetypex-source" -mindepth 1 -maxdepth 1 -type d)
-          nix flake check "path:$source_dir" --no-build --no-write-lock-file
-
   arch-linux:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
       - name: 安装构建依赖
         run: >-
-          pacman -Syu --noconfirm git cmake clang boost fcitx5 fcitx5-qt libime libc++
+          pacman -Syu --noconfirm git cmake clang boost ibus libadwaita libc++
           json-c curl openssl bubblewrap util-linux python python-fonttools python-pillow fontconfig qt6-base qt6-svg
           qt6-webengine layer-shell-qt pipewire ffmpeg wl-clipboard libnotify polkit
       - uses: actions/checkout@v7
@@ -48,7 +27,7 @@ jobs:
             sh -n "$script"
           done
           python3 -m py_compile scripts/setup_runtime.py scripts/wechat_emoticons.py scripts/voice_stream.py tools/*.py \
-            build/fcitx5-wetypex-syncd build/fcitx5-wetypex-update build/fcitx5-wetypex-sync
+            build/wetypex-syncd build/wetypex-update build/wetypex-sync
       - name: 构建 Arch 软件包（启用 LTO）
         run: |
           python3 tools/package_release.py
@@ -59,13 +38,13 @@ jobs:
             >> /tmp/wetypex-makepkg.conf
           su builder -c "cd '$PWD/dist/arch' && makepkg --config /tmp/wetypex-makepkg.conf -C -f --noconfirm"
           cd dist/arch
-          sha256sum fcitx5-wetypex-*-x86_64.pkg.tar.zst > SHA256SUMS
+          sha256sum ibus-wetypex-*-x86_64.pkg.tar.zst > SHA256SUMS
       - name: 保存 Arch 测试包
         uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-wetypex-arch-package
+          name: ibus-wetypex-arch-package
           path: |
-            dist/arch/fcitx5-wetypex-*-x86_64.pkg.tar.zst
+            dist/arch/ibus-wetypex-*-x86_64.pkg.tar.zst
             dist/arch/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
@@ -87,7 +66,7 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" \
             -e WETYPEX_BUILD_JOBS=2 \
             -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
-            wetypex-build-jammy env WETYPEX_LAYER_SHELL=OFF /src/packaging/container-stage.sh /out/debian-root lib
+            wetypex-build-jammy env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/debian-root lib
           test -f dist/debian-root/usr/lib/x86_64-linux-gnu/fcitx5/qt5/libwetypexconfig.so
       - name: 生成 deb 与校验和
         run: |
@@ -99,13 +78,13 @@ jobs:
           "$(go env GOPATH)/bin/nfpm" package --config dist/nfpm-debian.yaml \
             --packager deb --target dist/debian/
           cd dist/debian
-          sha256sum fcitx5-wetypex_*.deb > SHA256SUMS
+          sha256sum ibus-wetypex_*.deb > SHA256SUMS
       - name: 保存兼容旧系统的 deb
         uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-wetypex-jammy-deb
+          name: ibus-wetypex-jammy-deb
           path: |
-            dist/debian/fcitx5-wetypex_*.deb
+            dist/debian/ibus-wetypex_*.deb
             dist/debian/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
@@ -127,7 +106,7 @@ jobs:
       - name: 在 Ubuntu 26.04 构建 IBus 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-ibus-package.sh
+        run: bash packaging/build-ubuntu-package.sh
       - name: 验证 IBus 包元数据与前端依赖
         shell: bash
         run: |
@@ -140,11 +119,11 @@ jobs:
             | tar -xOf - ./usr/share/ibus/component/ibus-wetypex.xml \
             | xmllint --noout -
           dpkg-deb --contents "$package" | grep 'ibus-engine-wetypex'
-          dpkg-deb --contents "$package" | grep './usr/bin/ibus-wetypex-setup'
-          dpkg-deb --contents "$package" | grep './usr/bin/ibus-wetypex-settings'
-          dpkg-deb --contents "$package" | grep './usr/share/applications/ibus-wetypex-settings.desktop'
+          dpkg-deb --contents "$package" | grep './usr/bin/wetypex-setup'
+          dpkg-deb --contents "$package" | grep './usr/bin/wetypex-settings'
+          dpkg-deb --contents "$package" | grep './usr/share/applications/wetypex-settings.desktop'
           if dpkg-deb --contents "$package" \
-            | grep -E '\./usr/(bin/fcitx5-wetypex-|lib/fcitx5-wetypex/|share/applications/fcitx5-wetypex)'; then
+            | grep -E '\./usr/(bin/wetypex-|lib/ibus-wetypex/|share/applications/wetypex)'; then
             echo "IBus package contains paths owned by the Fcitx5 package" >&2
             exit 1
           fi
@@ -166,17 +145,17 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: fcitx5-wetypex-jammy-deb
+          name: ibus-wetypex-jammy-deb
           path: packages
       - name: 安装软件包并启动网络诊断
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
-          fcitx5-wetypex-account network-info
+          wetypex-account network-info
       - name: 启动设置窗口
         run: |
           status=0
-          QT_QPA_PLATFORM=offscreen timeout 3 fcitx5-wetypex-settings || status=$?
+          QT_QPA_PLATFORM=offscreen timeout 3 wetypex-settings || status=$?
           test "$status" -eq 124
 
   ubuntu-focal-legacy:
@@ -195,10 +174,10 @@ jobs:
           docker build -f packaging/docker/ubuntu20.Dockerfile -t wetypex-build-focal .
           docker run --rm --user "$(id -u):$(id -g)" \
             -e WETYPEX_BUILD_JOBS=2 -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
-            wetypex-build-focal env WETYPEX_LAYER_SHELL=OFF /src/packaging/container-stage.sh /out/ubuntu20-root lib
+            wetypex-build-focal env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/ubuntu20-root lib
           docker run --rm -v "$PWD/dist:/out:ro" wetypex-build-focal \
-            env WETYPE_SUPPORT_DIR=/out/ubuntu20-root/usr/lib/fcitx5-wetypex \
-            /out/ubuntu20-root/usr/bin/fcitx5-wetypex-account network-info
+            env WETYPE_SUPPORT_DIR=/out/ubuntu20-root/usr/lib/ibus-wetypex \
+            /out/ubuntu20-root/usr/bin/wetypex-account network-info
       - name: 生成 legacy deb
         run: |
           version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
@@ -212,12 +191,12 @@ jobs:
             -e 's/libjson-c5/libjson-c4/' \
             packaging/nfpm.yaml > dist/nfpm-focal.yaml
           "$(go env GOPATH)/bin/nfpm" package --config dist/nfpm-focal.yaml --packager deb \
-            --target "dist/ubuntu20/fcitx5-wetypex-legacy_${version}-${revision}_amd64.deb"
+            --target "dist/ubuntu20/ibus-wetypex-legacy_${version}-${revision}_amd64.deb"
           cd dist/ubuntu20
           sha256sum *.deb > SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-wetypex-focal-legacy
+          name: ibus-wetypex-focal-legacy
           path: dist/ubuntu20/
           if-no-files-found: error
           retention-days: 30

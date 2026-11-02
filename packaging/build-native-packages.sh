@@ -28,7 +28,7 @@ docker run --rm "${docker_network_args[@]}" --user "$(id -u):$(id -g)" \
     -e WETYPEX_BUILD_JOBS="${WETYPEX_BUILD_JOBS:-2}" \
     -v "$project_root:/src:ro" -v "$output:/out" \
     wetypex-build-debian \
-    env WETYPEX_LAYER_SHELL=OFF /src/packaging/container-stage.sh /out/debian-root lib
+    env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/debian-root lib
 
 # docker build "${docker_network_args[@]}" -q -f "$project_root/packaging/docker/fedora.Dockerfile" \
 #     -t wetypex-build-fedora "$project_root" >/dev/null
@@ -36,7 +36,7 @@ docker run --rm "${docker_network_args[@]}" --user "$(id -u):$(id -g)" \
 #     -e WETYPEX_BUILD_JOBS="${WETYPEX_BUILD_JOBS:-2}" \
 #     -v "$project_root:/src:ro" -v "$output:/out" \
 #     wetypex-build-fedora \
-#     env WETYPEX_LAYER_SHELL=ON /src/packaging/container-stage.sh /out/fedora-root lib64
+#     env WETYPEX_LAYER_SHELL=ON /src/packaging/stage-container.sh /out/fedora-root lib64
 
 sed -e "s|@WETYPEX_VERSION@|$version|g" \
     -e "s|@WETYPEX_STAGE@|$output/debian-root|g" \
@@ -59,7 +59,7 @@ nfpm package --config "$output/nfpm-debian.yaml" --packager deb \
 # docker run --rm "${docker_network_args[@]}" --user "$(id -u):$(id -g)" \
 #     -e WETYPEX_BUILD_JOBS="${WETYPEX_BUILD_JOBS:-2}" \
 #     -v "$project_root:/src:ro" -v "$output:/out" \
-#     wetypex-build-ubuntu20 env WETYPEX_LAYER_SHELL=OFF /src/packaging/container-stage.sh /out/ubuntu20-root lib
+#     wetypex-build-ubuntu20 env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/ubuntu20-root lib
 # sed -e "s|@WETYPEX_VERSION@|$version|g" \
 #     -e "s|@WETYPEX_STAGE@|$output/ubuntu20-root|g" \
 #     -e "s|@WETYPEX_PROJECT_ROOT@|$project_root|g" \
@@ -69,4 +69,4 @@ nfpm package --config "$output/nfpm-debian.yaml" --packager deb \
 #     -e 's/libjson-c5/libjson-c4/' \
 #     "$project_root/packaging/nfpm.yaml" >"$output/nfpm-ubuntu20.yaml"
 # nfpm package --config "$output/nfpm-ubuntu20.yaml" --packager deb \
-#     --target "$output/ubuntu20/fcitx5-wetypex-legacy_${version}-${revision}_amd64.deb"
+#     --target "$output/ubuntu20/ibus-wetypex-legacy_${version}-${revision}_amd64.deb"

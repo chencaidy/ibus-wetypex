@@ -28,11 +28,11 @@
 namespace {
 QString dataRoot() {
   return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
-         QStringLiteral("/fcitx5-wetypex");
+         QStringLiteral("/wetypex");
 }
 QString transferAsset(const QString &directory, const QString &name) {
   return QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                QStringLiteral("fcitx5-wetypex/ui/") +
+                                QStringLiteral("wetypex/ui/") +
                                     directory + QLatin1Char('/') + name);
 }
 
@@ -185,7 +185,7 @@ class TransferWindow final : public QWidget {
 public:
   TransferWindow() {
     setWindowTitle(QStringLiteral("WeTypeX 隔空传送"));
-    setWindowIcon(QIcon::fromTheme(QStringLiteral("fcitx5-wetypex")));
+    setWindowIcon(QIcon::fromTheme(QStringLiteral("wetypex")));
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     resize(317, 519);
     setStyleSheet(QStringLiteral(
@@ -831,8 +831,8 @@ private:
 
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
-  app.setApplicationName(QStringLiteral("fcitx5-wetypex-transfer"));
-  app.setDesktopFileName(QStringLiteral("fcitx5-wetypex-transfer"));
+  app.setApplicationName(QStringLiteral("wetypex-transfer"));
+  app.setDesktopFileName(QStringLiteral("wetypex-transfer"));
   TransferWindow window;
   window.show();
   return app.exec();

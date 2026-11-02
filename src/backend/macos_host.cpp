@@ -1522,7 +1522,7 @@ static DarwinMallocZone default_malloc_zone{nullptr,
                                             shim_malloc_zone_free,
                                             shim_malloc_zone_realloc,
                                             shim_malloc_zone_destroy,
-                                            "fcitx5-wetypex"};
+                                            "ibus-wetypex"};
 extern "C" void *shim_malloc_default_zone() { return &default_malloc_zone; }
 extern "C" void *shim_malloc_create_zone(size_t, unsigned) {
   return &default_malloc_zone;
