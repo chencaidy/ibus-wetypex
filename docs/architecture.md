@@ -17,7 +17,8 @@ WeTypeX 将原版桌面输入核心接入 Fcitx5，同时让 Linux 桌面负责�
 | `fcitx5-wetypex-account` | 执行配对、设备组、同步、语音和传输业务请求 |
 | `fcitx5-wetypex-syncd` | 轮询设备组并交换剪贴板内容 |
 | `fcitx5-wetypex-transfer` | 生成官方二维码、发布临时 CA 与连接角色，并驱动原版 Flurry LAN/WXP2P 文件通道 |
-| `fcitx5-wetypex-settings` | 独立设置窗口，与 Fcitx5 配置页共用配置 |
+| `fcitx5-wetypex-settings` | Fcitx5 专用 Qt 设置窗口，与 Fcitx5 配置页共用配置 |
+| `ibus-wetypex-settings` | IBus 专用 GTK4 + libadwaita 设置窗口，管理输入、常用语和跨设备同步 |
 | `libwetypexconfig.so` | Fcitx5 Qt6 配置页中的完整设置、账号与同步入口 |
 | `fcitx5-wetypex-ai` | 调用原版 AI 服务并打开问答窗口 |
 | `fcitx5-wetypex-voice` | PipeWire/PulseAudio 流式采集、原版语音引擎会话和结果投递 |

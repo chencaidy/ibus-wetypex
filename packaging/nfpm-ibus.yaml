@@ -27,6 +27,8 @@ overrides:
       - ibus
       - libibus-1.0-5
       - libglib2.0-0t64
+      - libgtk-4-1
+      - libadwaita-1-0
       - libqt6widgets6
       - libqt6network6
       - libqt6dbus6

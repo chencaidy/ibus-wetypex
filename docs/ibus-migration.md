@@ -33,7 +33,7 @@ fcitx5-wetypex-backend → wetypex-engine-host → 原版输入核心
 - `wetypex-engine-host`、原版核心与词典的加载和 ABI 兼容代码。
 - 插件与后端之间的 JSON 操作协议、会话 ID、序号、epoch、候选修订号及异步更新机制。IBus 前端可实现相同协议，后端不必认识 Fcitx5 或 IBus。
 - 账户配对、设备同步、词库、语音、AI、文件传输和安装运行时的主要业务程序。
-- Qt 设置主窗口、AI 窗口及多数用户配置项；它们不必作为 IBus 插件加载。
+- IBus 设置窗口使用独立的 `src/ibus-settings` GTK4 + libadwaita 实现，只读写 IBus 实际使用的配置项；Fcitx5 的 Qt 设置窗口保持不变。
 - 桌面剪贴板、音频采集和网络桥接工具，只要新前端继续提供相同的操作及焦点语义。
 
 `src/ai/main.cpp` 是独立 Qt 窗口，不是 Fcitx5 插件；可以保留。迁移时仍需检查窗口应用标识、资源目录和 helper 命令等含 `fcitx5` 的路径/名称。

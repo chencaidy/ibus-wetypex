@@ -8,3 +8,4 @@ Exec=ibus-wetypex-settings
 Icon=@CMAKE_INSTALL_FULL_DATADIR@/icons/hicolor/256x256/apps/fcitx5-wetypex.png
 Categories=Settings;Utility;
 StartupNotify=true
+StartupWMClass=ibus-wetypex-settings

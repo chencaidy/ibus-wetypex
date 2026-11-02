@@ -137,15 +137,35 @@ endif()
 set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/fcitx5-wetypex")
 if(WETYPE_BUILD_IBUS)
   pkg_check_modules(IBUS REQUIRED IMPORTED_TARGET ibus-1.0)
+  pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+  pkg_check_modules(ADW REQUIRED IMPORTED_TARGET libadwaita-1>=1.4)
+  pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
   add_executable(ibus-engine-wetypex src/ibus/main.cpp)
   target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
   target_compile_definitions(ibus-engine-wetypex PRIVATE
     WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
     WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-syncd")
   target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
+
+  add_executable(ibus-wetypex-settings
+    src/ibus-settings/main.cpp
+    src/ibus-settings/settings_store.cpp
+    src/ibus-settings/engine_client.cpp
+    src/ibus-settings/account_client.cpp)
+  target_link_libraries(ibus-wetypex-settings PRIVATE
+    PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
+  target_compile_definitions(ibus-wetypex-settings PRIVATE
+    ADW_VERSION_MIN_REQUIRED=ADW_VERSION_1_4
+    ADW_VERSION_MAX_ALLOWED=ADW_VERSION_1_4
+    GDK_VERSION_MIN_REQUIRED=GDK_VERSION_4_6
+    GDK_VERSION_MAX_ALLOWED=GDK_VERSION_4_6
+    WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-account"
+    WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/fcitx5-wetypex-backend"
+    WETYPE_VERSION="${PROJECT_VERSION}")
+  target_compile_options(ibus-wetypex-settings PRIVATE -Wall -Wextra)
+
   configure_file(data/ibus-wetypex.xml.in ibus-wetypex.xml @ONLY)
   configure_file(scripts/ibus-wetypex-setup.sh.in ibus-wetypex-setup @ONLY)
-  configure_file(scripts/ibus-wetypex-settings.sh.in ibus-wetypex-settings @ONLY)
   configure_file(data/ibus-wetypex-settings.desktop.in
     ibus-wetypex-settings.desktop @ONLY)
 endif()
@@ -236,9 +256,10 @@ if(WETYPE_BUILD_FCITX5)
 endif()
 if(WETYPE_BUILD_IBUS)
   install(TARGETS ibus-engine-wetypex RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+  install(TARGETS ibus-wetypex-settings RUNTIME DESTINATION bin)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex.xml DESTINATION share/ibus/component)
   install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex-setup
-    ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex-settings DESTINATION bin)
+    DESTINATION bin)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ibus-wetypex-settings.desktop
     DESTINATION share/applications)
 endif()
