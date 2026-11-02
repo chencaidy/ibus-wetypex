@@ -29,6 +29,16 @@ Fcitx5 输入插件和 Qt5/Qt6 配置插件采用 `FCITX_INSTALL_ADDONDIR`；私
 
 系统 OpenSSL 低于 3 时，构建私有静态 OpenSSL 3.5.5；其源代码与 SHA-256 固定在 `cmake/BundledOpenSSL.cmake`，许可证随包安装。CMake 3.16/3.17 使用 curl 发布源码中的 configure 构建，仍保持 WS/WSS、证书校验和 LTO 隔离。Fedora 40 构建使用签名校验开启的官方归档仓库。
 
+## IBus 独立包
+
+Ubuntu 26.04 的 IBus 变体使用 `ibus-wetypex` 包名，与 Fcitx5 包分别构建和发布。构建脚本只启用 IBus 前端，不查找或链接 Fcitx5 开发组件；共享可执行文件和数据安装到 `/usr/lib/ibus-wetypex` 下，系统入口仅使用 IBus 专属名称，以避免 dpkg 文件冲突：
+
+```bash
+bash packaging/build-ibus-package.sh
+```
+
+该脚本需要 Docker 和 nFPM，生成的 `.deb` 位于 `dist/ibus/`。包依赖 IBus 与共享业务运行时，不依赖 Fcitx5；引擎元数据安装到 `/usr/share/ibus/component`，可执行引擎安装到隔离的 libexec 目录。`ibus-wetypex-setup`、`ibus-wetypex-settings` 和设置菜单入口使用 IBus 专属名称。运行时配置、账户及剪贴板同步仍沿用现有 XDG 用户数据路径。首版不提供 AI、语音、V 模式或剪贴板历史。
+
 也可以只生成源码包与 Arch 构建文件：
 
 ```bash
@@ -53,7 +63,7 @@ makepkg -C -f --noconfirm
 - `packaging/PKGBUILD.in` 的 `pkgver`。
 - `tools/package_release.py` 的 `version`。
 - 发布修订时同步更新 `packaging/PKGBUILD.in`、AUR `PKGBUILD` 的
-  `pkgrel` 与 `packaging/nfpm.yaml` 的 `release`。
+  `pkgrel` 与 `packaging/nfpm.yaml`、`packaging/nfpm-ibus.yaml` 的 `release`。
 - README 安装示例。
 
 ## 安装布局
@@ -66,13 +76,13 @@ makepkg -C -f --noconfirm
 2. 检查软件包中没有原版运行时或账户数据。
 3. 检查所有脚本中的安装前缀已由 CMake 替换。
 4. 在新用户目录执行 `setup --archive` 和 `setup --check`。
-5. 在真实 Fcitx5 会话验证全拼输入、候选选择和设置入口。
-6. 检查 deb、rpm、Arch 和便携归档的依赖与文件布局。
+5. 在真实 Fcitx5 会话验证全拼输入、候选选择和设置入口；在目标 IBus 桌面检查引擎发现、密码框旁路、候选上屏与远程剪贴板同步。
+6. 检查 deb、IBus deb、rpm、Arch 和便携归档的依赖与文件布局。
 7. 将 `dist/SHA256SUMS` 随 GitHub Release 一并发布。
 
 ## GitHub Release
 
-推送由 `CMakeLists.txt` 版本和软件包修订号组成的 `vX.Y.Z.B-N` 标签会触发发布工作流。工作流分别在 Arch Linux、Ubuntu 22.04、Ubuntu 20.04 和 Fedora 40 环境构建软件包，生成源码包、便携归档与 SHA-256 校验文件，并创建或更新同名 GitHub Release。标签与源码版本或修订号不一致时，工作流会直接失败。
+推送由 `CMakeLists.txt` 版本和软件包修订号组成的 `vX.Y.Z.B-N` 标签会触发发布工作流。工作流分别在 Arch Linux、Ubuntu 22.04、Ubuntu 20.04、Ubuntu 26.04 IBus 和 Fedora 40 环境构建软件包，生成源码包、便携归档与 SHA-256 校验文件，并创建或更新同名 GitHub Release。标签与源码版本或修订号不一致时，工作流会直接失败。
 
 ## 星火应用商店投递准备
 

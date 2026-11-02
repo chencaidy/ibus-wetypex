@@ -110,6 +110,51 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  ibus-ubuntu-2604:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - name: 安装 IBus 包构建与 XML 校验工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-utils
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+          sudo install "$(go env GOPATH)/bin/nfpm" /usr/local/bin/nfpm
+      - name: 在 Ubuntu 26.04 构建 IBus 软件包
+        env:
+          WETYPEX_BUILD_JOBS: "2"
+        run: bash packaging/build-ibus-package.sh
+      - name: 验证 IBus 包元数据与前端依赖
+        shell: bash
+        run: |
+          package=$(find dist/ibus -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
+          test -n "$package"
+          test "$(dpkg-deb -f "$package" Package)" = ibus-wetypex
+          dpkg-deb -f "$package" Depends | grep -Eq '(^|, )ibus(,|$)'
+          ! dpkg-deb -f "$package" Depends | grep -qi fcitx
+          dpkg-deb --fsys-tarfile "$package" \
+            | tar -xOf - ./usr/share/ibus/component/ibus-wetypex.xml \
+            | xmllint --noout -
+          dpkg-deb --contents "$package" | grep 'ibus-engine-wetypex'
+          dpkg-deb --contents "$package" | grep './usr/bin/ibus-wetypex-setup'
+          dpkg-deb --contents "$package" | grep './usr/bin/ibus-wetypex-settings'
+          dpkg-deb --contents "$package" | grep './usr/share/applications/ibus-wetypex-settings.desktop'
+          if dpkg-deb --contents "$package" \
+            | grep -E '\./usr/(bin/fcitx5-wetypex-|lib/fcitx5-wetypex/|share/applications/fcitx5-wetypex)'; then
+            echo "IBus package contains paths owned by the Fcitx5 package" >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ibus-wetypex-ubuntu-26.04
+          path: dist/ibus/ibus-wetypex_*.deb
+          if-no-files-found: error
+          retention-days: 30
+
   deb-runtime:
     needs: ubuntu-jammy-deb
     runs-on: ubuntu-latest

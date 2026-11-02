@@ -1,0 +1,24 @@
+<component>
+  <name>org.freedesktop.IBus.Wetypex</name>
+  <description>WeTypeX input method for IBus</description>
+  <version>@PROJECT_VERSION@</version>
+  <license>MIT</license>
+  <author>WeTypeX contributors</author>
+  <homepage>https://github.com/panxuc/fcitx5-wetypex</homepage>
+  <exec>@CMAKE_INSTALL_FULL_LIBEXECDIR@/ibus-engine-wetypex --ibus</exec>
+  <textdomain>ibus-wetypex</textdomain>
+  <engines>
+    <engine>
+      <name>wetypex</name>
+      <longname>WeTypeX</longname>
+      <description>WeTypeX Chinese input method</description>
+      <language>zh</language>
+      <symbol>微</symbol>
+      <license>MIT</license>
+      <author>WeTypeX contributors</author>
+      <icon>@CMAKE_INSTALL_FULL_DATADIR@/icons/hicolor/48x48/apps/fcitx5-wetypex.png</icon>
+      <layout>default</layout>
+      <rank>90</rank>
+    </engine>
+  </engines>
+</component>

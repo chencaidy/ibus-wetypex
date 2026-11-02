@@ -5,12 +5,13 @@
 <h1 align="center">WeTypeX</h1>
 
 <p align="center">
-  在 Linux 上通过 Fcitx5 使用微信输入法的兼容项目。
+  在 Linux 上通过 Fcitx5 或 IBus 使用微信输入法的兼容项目。
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Linux-x86__64-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux x86-64">
   <img src="https://img.shields.io/badge/Input-Fcitx5-27A7E7?style=flat-square" alt="Fcitx5">
+  <img src="https://img.shields.io/badge/Input-IBus-27A7E7?style=flat-square" alt="IBus">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT 许可证"></a>
 </p>
 
@@ -37,6 +38,7 @@
 | 智能拼写与云候选 | 原版本地候选与桌面云候选合并，云端新增候选带 ☁ 标记 |
 | 微信表情 | 仅在可识别的微信客户端中推荐，候选显示用户安装包中的原图；普通 emoji 保留 |
 | Fcitx5 输入体验 | 原生 input method 插件、内嵌预编辑、分页与选词 |
+| IBus 输入体验 | 独立前端初版：预编辑、候选交互与远程剪贴板同步；尚待目标桌面端到端验证 |
 | 账户与设备 | 官方六位匹配码、确认配对、设备组和功能开关 |
 | 跨设备剪贴板 | 文字与原始 PNG 图片双向同步 |
 | 个人词库与常用语 | 本地持久化；设备组同步器已接入 |
@@ -45,7 +47,7 @@
 | 隔空传送 | 官方传输码与二维码、原版 Flurry LAN 与 WXP2P 直连/中继通道 |
 | V 模式 | 原版计算候选，以及计算、剪贴板、常用语和符号快捷栏 |
 
-目前仅在 Arch Linux、KDE Plasma 和 Wayland 上进行过测试。各项能力的支持范围见[功能状态](docs/feature-status.md)。
+目前既有 Fcitx5 版本仅在 Arch Linux、KDE Plasma 和 Wayland 上进行过测试；IBus 初版的目标环境为 Ubuntu 26.04、GNOME 50 和 Wayland，尚未完成端到端验收。各项能力的支持范围见[功能状态](docs/feature-status.md)。
 
 ## 工作方式
 
@@ -53,9 +55,9 @@ WeTypeX 安装程序从官方包中提取输入核心与词典，生成固定地
 
 ```text
 应用程序
-   │ Fcitx5 input context
+   │ Fcitx5 或 IBus input context
    ▼
-WeTypeX 插件 ────────── 候选、预编辑、快捷键、剪贴板
+WeTypeX 前端 ────────── 候选、预编辑、快捷键、剪贴板
    │ 私有管道
    ▼
 受限引擎宿主 ───────── 原版输入核心、词典与 Flurry/WXP2P 文件通道
@@ -98,6 +100,19 @@ sudo apt install ./fcitx5-wetypex_2.2.3.657-14_amd64.deb
 Ubuntu 20.04 和 glibc 2.31 的系统使用独立的 `fcitx5-wetypex-legacy_..._amd64.deb`。安装前需要稳定版 Fcitx5 5.0.14+、fcitx5-qt 5.0.10+ 与 LibIME 1.0.11+；20.04 原生仓库中的 `0.0~git` 预览版使用不同 ABI，不能直接加载此插件。可按 [Fcitx 上游安装说明](https://fcitx-im.org/wiki/Install_Fcitx_5) 安装稳定框架。旧系统包私有静态包含 OpenSSL 3，不替换系统的 OpenSSL 1.1。语音可使用现有的 PulseAudio 或 pipewire-pulse；现代 PipeWire 使用 `pw-record` 原始 PCM，旧版或缺少该工具时自动选择 `parec`，再回退到 FFmpeg 的 PulseAudio 输入。
 
 源码构建支持 CMake 3.16、C++17、Python 3.8、Qt5.12+，也可自动使用完整的 Qt6 开发环境。用 `-DWETYPE_QT_VERSION=5` 或 `6` 指定界面工具链。配置插件采用发行版的 Fcitx5 安装目录；不同 Qt ABI 的配置入口按构建环境提供。完整设置始终可通过 `fcitx5-wetypex-settings` 打开。
+
+#### IBus（Ubuntu 26.04）
+
+IBus 使用独立的 `ibus-wetypex` 包，不依赖 Fcitx5，并将共享运行时文件放在独立目录以便与 Fcitx5 包共存。首次使用前运行 `ibus-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip` 准备官方运行时。安装包后，在 GNOME“设置 → 键盘 → 输入源”中添加 **WeTypeX**；必要时执行 `ibus restart` 或重新登录。设置程序可从应用菜单或 `ibus-wetypex-settings` 启动。初版保留全拼、双拼、五笔及远程剪贴板同步，不提供 AI、语音、V 模式和剪贴板历史。当前移植尚未完成目标桌面的端到端验证。
+
+在 Ubuntu 26.04 构建该包需要 Docker 和 nFPM：
+
+```bash
+bash packaging/build-ibus-package.sh
+sudo apt install ./dist/ibus/ibus-wetypex_2.2.3.657-14_amd64.deb
+```
+
+源码构建也可显式只启用 IBus 前端：将 `-DWETYPE_BUILD_FCITX5=OFF -DWETYPE_BUILD_IBUS=ON` 传给 CMake。默认仍构建 Fcitx5，以保持既有行为。
 
 ### Fedora 与兼容的 RPM 发行版
 
@@ -290,6 +305,7 @@ fcitx5-diagnose | less
 ## 文档
 
 - [架构说明](docs/architecture.md)
+- [从 Fcitx5 迁移到 IBus：可行性与实施建议](docs/ibus-migration.md)
 - [功能状态](docs/feature-status.md)
 - [配置参考](docs/configuration.md)
 - [Linux 微信表情原图与应用识别](docs/wechat-emoticons.md)
@@ -300,7 +316,7 @@ fcitx5-diagnose | less
 
 ## 参与开发
 
-提交问题时请附上桌面环境、显示协议、Fcitx5 版本和去除隐私信息后的日志。界面变更应注明参考平台与版本。具体要求见[贡献指南](CONTRIBUTING.md)和[安全策略](SECURITY.md)。
+提交问题时请附上桌面环境、显示协议、输入法框架及版本和去除隐私信息后的日志。界面变更应注明参考平台与版本。具体要求见[贡献指南](CONTRIBUTING.md)和[安全策略](SECURITY.md)。
 
 ## 许可与声明
 
