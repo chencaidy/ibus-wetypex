@@ -83,7 +83,7 @@ sudo apt install ./dist/ubuntu26/ibus-wetypex_2.2.3.657-1_amd64.deb
 ### 便携归档
 
 ```bash
-sudo tar --zstd -C / -xf ./ibus-wetypex-2.2.3.657-14-linux-x86_64.tar.zst
+sudo tar --zstd -C / -xf ./ibus-wetypex-2.2.3.657-1-linux-x86_64.tar.zst
 ```
 
 便携归档不经过软件包管理器解析依赖，更适合已经准备好运行环境的系统。
