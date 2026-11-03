@@ -118,8 +118,9 @@ struct EngineState {
   std::vector<std::string> candidates;
   std::vector<bool> cloud;
   std::vector<DeferredKey> deferredKeys;
-  IBusPropList *modeProperties = nullptr;
+  IBusPropList *properties = nullptr;
   IBusProperty *modeProperty = nullptr;
+  IBusProperty *restartProperty = nullptr;
   int candidatePage = 0;
   int candidateCursor = 0;
   int contentPurpose = IBUS_INPUT_PURPOSE_FREE_FORM;
@@ -223,8 +224,6 @@ void clearUi(EngineState *state) {
                                   FALSE);
   ibus_engine_update_lookup_table(
       engine, ibus_lookup_table_new(5, 0, FALSE, FALSE), FALSE);
-  ibus_engine_update_auxiliary_text(
-      engine, ibus_text_new_from_string(""), FALSE);
   state->renderedPreedit.clear();
   state->renderedCursor = 0;
   state->renderedPreeditVisible = false;
@@ -283,11 +282,6 @@ void updateUi(EngineState *state) {
       (state->inputSequence > state->applied || state->selectionPending);
   const bool showCandidates =
       !state->preedit.empty() && !pending && !state->candidates.empty();
-  ibus_engine_update_auxiliary_text(
-      engine,
-      ibus_text_new_from_string(
-          state->backendFailed ? "WeTypeX 核心暂不可用" : ""),
-      state->backendFailed);
   if (pending && !state->preedit.empty())
     return;
   auto *table = ibus_lookup_table_new(
@@ -381,8 +375,8 @@ gboolean backendReadable(gint fd, GIOCondition condition, gpointer data) {
 gboolean backendWritable(gint fd, GIOCondition condition, gpointer data) {
   auto *state = static_cast<EngineState *>(data);
   while (!state->outbound.empty()) {
-    const ssize_t count =
-        ::send(fd, state->outbound.data(), state->outbound.size(), MSG_NOSIGNAL);
+    const ssize_t count = ::send(fd, state->outbound.data(),
+                                 state->outbound.size(), MSG_NOSIGNAL);
     if (count > 0) {
       state->outbound.erase(0, static_cast<size_t>(count));
       continue;
@@ -433,6 +427,7 @@ void closeBackend(EngineState *state, bool fromReadWatch) {
     }
     state->backendPid = -1;
   }
+  g_debug("WeTypeX backend closed.");
 }
 
 bool startBackend(EngineState *state) {
@@ -461,9 +456,8 @@ bool startBackend(EngineState *state) {
   const char *override = g_getenv("WETYPE_BACKEND_LAUNCHER");
   std::string launcher = override && *override ? override : WETYPE_LAUNCHER;
   char *argv[] = {launcher.data(), nullptr};
-  const int result =
-      posix_spawn(&state->backendPid, launcher.c_str(), &actions, nullptr, argv,
-                  environ);
+  const int result = posix_spawn(&state->backendPid, launcher.c_str(), &actions,
+                                 nullptr, argv, environ);
   posix_spawn_file_actions_destroy(&actions);
   close(toChild[0]);
   close(fromChild[1]);
@@ -478,13 +472,24 @@ bool startBackend(EngineState *state) {
   state->readFd = fromChild[0];
   fcntl(state->writeFd, F_SETFL, fcntl(state->writeFd, F_GETFL) | O_NONBLOCK);
   fcntl(state->readFd, F_SETFL, fcntl(state->readFd, F_GETFL) | O_NONBLOCK);
-  state->readSource =
-      g_unix_fd_add(state->readFd,
-                    static_cast<GIOCondition>(G_IO_IN | G_IO_HUP | G_IO_ERR |
-                                              G_IO_NVAL),
-                    backendReadable, state);
+  state->readSource = g_unix_fd_add(
+      state->readFd,
+      static_cast<GIOCondition>(G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL),
+      backendReadable, state);
   state->backendFailed = false;
+  g_debug("WeTypeX backend running.");
   return true;
+}
+
+void resetComposition(EngineState *state, bool sendReset);
+
+void restartBackend(EngineState *state) {
+  g_message("WeTypeX backend restarting...");
+  resetComposition(state, false);
+  closeBackend(state);
+  state->backendFailed = false;
+  state->settings = readSettings();
+  updateUi(state);
 }
 
 void queueLine(EngineState *state, const std::string &line) {
@@ -709,42 +714,60 @@ void resetComposition(EngineState *state, bool sendReset) {
 void updateModeProperty(EngineState *state) {
   if (!state->modeProperty)
     return;
-  ibus_property_set_symbol(
-      state->modeProperty,
-      ibus_text_new_from_string(state->english ? "英" : "中"));
-  ibus_property_set_label(
-      state->modeProperty,
-      ibus_text_new_from_string(state->english ? "英文" : "中文"));
-  ibus_property_set_tooltip(
-      state->modeProperty,
-      ibus_text_new_from_string(state->english ? "英文输入模式" : "中文输入模式"));
+
+  if (state->backendFailed) {
+    ibus_property_set_symbol(state->modeProperty,
+                             ibus_text_new_from_string("✕"));
+    ibus_property_set_label(state->modeProperty,
+                            ibus_text_new_from_string("核心不可用"));
+  } else {
+    if (state->english) {
+      ibus_property_set_symbol(state->modeProperty,
+                               ibus_text_new_from_string("英"));
+      ibus_property_set_label(state->modeProperty,
+                              ibus_text_new_from_string("英文"));
+    } else {
+      ibus_property_set_symbol(state->modeProperty,
+                               ibus_text_new_from_string("中"));
+      ibus_property_set_label(state->modeProperty,
+                              ibus_text_new_from_string("中文"));
+    }
+  }
+
   ibus_engine_update_property(IBUS_ENGINE(state->owner), state->modeProperty);
 }
 
-void registerModeProperty(EngineState *state) {
-  if (!state->modeProperties) {
-    state->modeProperties = ibus_prop_list_new();
+void registerProperties(EngineState *state) {
+  if (!state->properties) {
+    state->properties = ibus_prop_list_new();
     // Sink the floating reference: ibus_engine_register_properties() only
     // unrefs *floating* lists, so this list survives every re-publish.
-    g_object_ref_sink(state->modeProperties);
-    auto *property = ibus_property_new(
+    g_object_ref_sink(state->properties);
+
+    auto *mode = ibus_property_new(
         "InputMode", PROP_TYPE_NORMAL, ibus_text_new_from_string("中文"),
-        nullptr, ibus_text_new_from_string("当前输入模式"), TRUE, TRUE,
+        "input-keyboard", ibus_text_new_from_string("当前输入模式"), TRUE, TRUE,
         PROP_STATE_UNCHECKED, nullptr);
     // The list takes its own reference, so keep a borrowed pointer only.
-    ibus_prop_list_append(state->modeProperties, property);
-    state->modeProperty = property;
+    ibus_prop_list_append(state->properties, mode);
+    state->modeProperty = mode;
+
+    auto *restart = ibus_property_new(
+        "RestartBackend", PROP_TYPE_NORMAL,
+        ibus_text_new_from_string("重启核心"), "system-restart",
+        ibus_text_new_from_string("重启 WeTypeX 核心进程"), TRUE, TRUE,
+        PROP_STATE_UNCHECKED, nullptr);
+    ibus_prop_list_append(state->properties, restart);
+    state->restartProperty = mode;
   }
-  ibus_engine_register_properties(IBUS_ENGINE(state->owner),
-                                  state->modeProperties);
-  updateModeProperty(state);
+
+  ibus_engine_register_properties(IBUS_ENGINE(state->owner), state->properties);
 }
 
 void setEnglishMode(EngineState *state, bool english) {
   sharedEnglishMode = english;
   sharedModeInitialized = true;
   if (state->english == english) {
-    updateModeProperty(state);
     return;
   }
   if (!state->preedit.empty()) {
@@ -758,7 +781,6 @@ void setEnglishMode(EngineState *state, bool english) {
   state->shiftWasUsed = false;
   state->candidates.clear();
   state->cloud.clear();
-  updateModeProperty(state);
   updateUi(state);
 }
 
@@ -932,17 +954,18 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
     if (release) {
       state->pressedShifts &= static_cast<uint8_t>(~bit);
       const bool switchMode =
-          state->pressedShifts == 0 && state->active &&
-          state->shiftCandidate && !state->shiftWasUsed &&
-          state->settings.shiftSwitch &&
+          state->pressedShifts == 0 && state->active && state->shiftCandidate &&
+          !state->shiftWasUsed && state->settings.shiftSwitch &&
           // librime's ascii_composer only treats a Shift press-release pair
           // within 500 ms as a tap; a held Shift means it was used as a
           // modifier (Shift+click), so it must not toggle the language.
           g_get_monotonic_time() - state->shiftPressedAt <= 500000;
       state->shiftCandidate = false;
       state->shiftWasUsed = false;
-      if (switchMode)
+      if (switchMode) {
         setEnglishMode(state, !state->english);
+        updateModeProperty(state);
+      }
       return FALSE;
     }
     state->pressedShifts |= bit;
@@ -1116,7 +1139,8 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
 void onFocusIn(IBusEngine *engine) {
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->focused = true;
-  registerModeProperty(self->state);
+  registerProperties(self->state);
+  updateModeProperty(self->state);
   activate(self->state);
 }
 
@@ -1168,19 +1192,16 @@ void onCursorUp(IBusEngine *engine) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   if (state->candidateCursor > 0) {
     state->candidateCursor--;
-    state->candidatePage =
-        state->candidateCursor / state->settings.pageSize;
+    state->candidatePage = state->candidateCursor / state->settings.pageSize;
     updateUi(state);
   }
 }
 
 void onCursorDown(IBusEngine *engine) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-  if (state->candidateCursor + 1 <
-      static_cast<int>(state->candidates.size())) {
+  if (state->candidateCursor + 1 < static_cast<int>(state->candidates.size())) {
     state->candidateCursor++;
-    state->candidatePage =
-        state->candidateCursor / state->settings.pageSize;
+    state->candidatePage = state->candidateCursor / state->settings.pageSize;
     updateUi(state);
   }
 }
@@ -1197,12 +1218,18 @@ void onContentType(IBusEngine *engine, guint purpose, guint) {
 }
 
 void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
-  // The panel exposes the mode property as a clickable item; activating it
-  // toggles Chinese/English, same as ibus-rime.
-  if (!propertyName || g_strcmp0(propertyName, "InputMode") != 0)
+  if (!propertyName)
     return;
+
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-  setEnglishMode(state, !state->english);
+  if (g_strcmp0(propertyName, "InputMode") == 0) {
+    // The panel exposes the mode property as a clickable item; activating it
+    // toggles Chinese/English, same as ibus-rime.
+    setEnglishMode(state, !state->english);
+  } else if (g_strcmp0(propertyName, "RestartBackend") == 0) {
+    restartBackend(state);
+  }
+  updateModeProperty(state);
 }
 
 void onSetCapabilities(IBusEngine *engine, guint capabilities) {
@@ -1219,8 +1246,8 @@ void finalize(GObject *object) {
       usleep(10000);
     }
     closeBackend(state);
-    if (state->modeProperties)
-      g_object_unref(state->modeProperties);
+    if (state->properties)
+      g_object_unref(state->properties);
     delete state;
     self->state = nullptr;
   }
@@ -1275,15 +1302,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  constexpr const char *serviceName = "org.freedesktop.IBus.Wetypex";
-  if (!ibus_bus_request_name(bus, serviceName, 0)) {
+  auto *factory = ibus_factory_new(ibus_bus_get_connection(bus));
+  ibus_factory_add_engine(factory, "wetypex", wetype_engine_get_type());
+
+  if (!ibus_bus_request_name(bus, "org.freedesktop.IBus.Wetypex", 0)) {
     g_printerr("Cannot register the WeTypeX IBus service name\n");
     g_object_unref(bus);
     return 1;
   }
-
-  auto *factory = ibus_factory_new(ibus_bus_get_connection(bus));
-  ibus_factory_add_engine(factory, "wetypex", wetype_engine_get_type());
 
   auto *loop = g_main_loop_new(nullptr, FALSE);
   g_signal_connect(bus, "disconnected",
