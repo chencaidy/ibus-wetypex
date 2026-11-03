@@ -9,9 +9,9 @@ url="https://github.com/chencaidy/ibus-wetypex"
 license=('MIT' 'ISC' 'BSD-2-Clause' 'curl')
 options=('!debug')
 depends=(
-    'fcitx5>=5.1.9'
-    'fcitx5-qt'
-    'libime>=1.1.15'
+    'ibus'
+    'gtk4'
+    'libadwaita'
     'libc++'
     'json-c'
     'curl'
@@ -34,7 +34,6 @@ depends=(
     'polkit'
 )
 makedepends=('cmake' 'clang' 'git' 'boost' 'openssl')
-optdepends=('fcitx5-configtool: manage input methods')
 source=(
     "${pkgname}-${pkgver}.tar.gz::${url}/releases/download/v${pkgver}-${pkgrel}/${pkgname}-${pkgver}.tar.gz"
     'https://curl.se/download/curl-8.22.0.tar.xz'

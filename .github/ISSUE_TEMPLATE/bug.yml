@@ -16,7 +16,7 @@ body:
     id: environment
     attributes:
       label: 系统与桌面环境
-      description: 发行版、Fcitx5、桌面、X11/Wayland
+      description: 发行版、IBus、桌面、X11/Wayland
     validations:
       required: true
   - type: textarea

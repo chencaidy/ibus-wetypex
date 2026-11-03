@@ -82,8 +82,6 @@ if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
     message(STATUS "WeTypeX Wayland V toolbar: layer-shell")
   elseif(WETYPE_LAYER_SHELL STREQUAL "ON")
     message(FATAL_ERROR "LayerShellQt for Qt${WETYPE_UI_QT_MAJOR} and wayland-client are required")
-  else()
-    message(STATUS "WeTypeX Wayland V toolbar: Fcitx menu fallback (layer-shell unavailable)")
   endif()
 endif()
 

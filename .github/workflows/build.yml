@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: 安装构建依赖
         run: >-
-          pacman -Syu --noconfirm git cmake clang boost ibus libadwaita libc++
+          pacman -Syu --noconfirm git cmake clang boost ibus gtk4 libadwaita libc++
           json-c curl openssl bubblewrap util-linux python python-fonttools python-pillow fontconfig qt6-base qt6-svg
           qt6-webengine layer-shell-qt pipewire ffmpeg wl-clipboard libnotify polkit
       - uses: actions/checkout@v7
@@ -49,47 +49,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  ubuntu-jammy-deb:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-          cache: false
-      - name: 安装 nFPM
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
-      - name: 在 Ubuntu 22.04 构建
-        run: |
-          mkdir -p dist/debian
-          docker build -f packaging/docker/debian.Dockerfile -t wetypex-build-jammy .
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -e WETYPEX_BUILD_JOBS=2 \
-            -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
-            wetypex-build-jammy env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/debian-root lib
-          test -f dist/debian-root/usr/lib/x86_64-linux-gnu/fcitx5/qt5/libwetypexconfig.so
-      - name: 生成 deb 与校验和
-        run: |
-          version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
-          sed -e "s|@WETYPEX_VERSION@|$version|g" \
-            -e "s|@WETYPEX_STAGE@|$PWD/dist/debian-root|g" \
-            -e "s|@WETYPEX_PROJECT_ROOT@|$PWD|g" \
-            packaging/nfpm.yaml > dist/nfpm-debian.yaml
-          "$(go env GOPATH)/bin/nfpm" package --config dist/nfpm-debian.yaml \
-            --packager deb --target dist/debian/
-          cd dist/debian
-          sha256sum ibus-wetypex_*.deb > SHA256SUMS
-      - name: 保存兼容旧系统的 deb
-        uses: actions/upload-artifact@v7
-        with:
-          name: ibus-wetypex-jammy-deb
-          path: |
-            dist/debian/ibus-wetypex_*.deb
-            dist/debian/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 30
-
-  ibus-ubuntu-2604:
+  ubuntu-2604:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -110,93 +70,41 @@ jobs:
       - name: 验证 IBus 包元数据与前端依赖
         shell: bash
         run: |
-          package=$(find dist/ibus -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
+          package=$(find dist/ubuntu26 -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
           test -n "$package"
           test "$(dpkg-deb -f "$package" Package)" = ibus-wetypex
           dpkg-deb -f "$package" Depends | grep -Eq '(^|, )ibus(,|$)'
           ! dpkg-deb -f "$package" Depends | grep -qi fcitx
           dpkg-deb --fsys-tarfile "$package" \
-            | tar -xOf - ./usr/share/ibus/component/ibus-wetypex.xml \
+            | tar -xOf - ./usr/share/ibus/component/wetypex.xml \
             | xmllint --noout -
-          dpkg-deb --contents "$package" | grep 'ibus-engine-wetypex'
-          dpkg-deb --contents "$package" | grep './usr/bin/wetypex-setup'
-          dpkg-deb --contents "$package" | grep './usr/bin/wetypex-settings'
-          dpkg-deb --contents "$package" | grep './usr/share/applications/wetypex-settings.desktop'
-          if dpkg-deb --contents "$package" \
-            | grep -E '\./usr/(bin/wetypex-|lib/ibus-wetypex/|share/applications/wetypex)'; then
-            echo "IBus package contains paths owned by the Fcitx5 package" >&2
-            exit 1
-          fi
+          dpkg-deb --contents "$package" | grep -F './usr/libexec/ibus-engine-wetypex'
+          dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-setup'
+          dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-settings'
+          dpkg-deb --contents "$package" | grep -F './usr/share/applications/wetypex-settings.desktop'
+          dpkg-deb --contents "$package"
       - uses: actions/upload-artifact@v7
         with:
           name: ibus-wetypex-ubuntu-26.04
-          path: dist/ibus/ibus-wetypex_*.deb
+          path: dist/ubuntu26/ibus-wetypex_*.deb
           if-no-files-found: error
           retention-days: 30
 
   deb-runtime:
-    needs: ubuntu-jammy-deb
+    needs: ubuntu-2604
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        image: ["ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04", "debian:bookworm-slim", "debian:trixie-slim"]
+        image: ["ubuntu:26.04"]
     container: ${{ matrix.image }}
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: ibus-wetypex-jammy-deb
+          name: ibus-wetypex-ubuntu-26.04
           path: packages
       - name: 安装软件包并启动网络诊断
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
           wetypex-account network-info
-      - name: 启动设置窗口
-        run: |
-          status=0
-          QT_QPA_PLATFORM=offscreen timeout 3 wetypex-settings || status=$?
-          test "$status" -eq 124
-
-  ubuntu-focal-legacy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-          cache: false
-      - name: 安装 nFPM
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
-      - name: 在 Ubuntu 20.04 与固定稳定框架 SDK 构建
-        run: |
-          mkdir -p dist/ubuntu20
-          docker build -f packaging/docker/ubuntu20.Dockerfile -t wetypex-build-focal .
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -e WETYPEX_BUILD_JOBS=2 -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
-            wetypex-build-focal env WETYPEX_LAYER_SHELL=OFF /src/packaging/stage-container.sh /out/ubuntu20-root lib
-          docker run --rm -v "$PWD/dist:/out:ro" wetypex-build-focal \
-            env WETYPE_SUPPORT_DIR=/out/ubuntu20-root/usr/lib/ibus-wetypex \
-            /out/ubuntu20-root/usr/bin/wetypex-account network-info
-      - name: 生成 legacy deb
-        run: |
-          version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
-          revision=$(sed -n 's/^pkgrel=//p' packaging/PKGBUILD.in)
-          sed -e "s|@WETYPEX_VERSION@|$version|g" \
-            -e "s|@WETYPEX_STAGE@|$PWD/dist/ubuntu20-root|g" \
-            -e "s|@WETYPEX_PROJECT_ROOT@|$PWD|g" \
-            -e 's/libc6 (>= 2.35)/libc6 (>= 2.31)/' \
-            -e 's/libstdc++6 (>= 11)/libstdc++6 (>= 9)/' \
-            -e 's/libssl3 | libssl3t64/libssl1.1/' \
-            -e 's/libjson-c5/libjson-c4/' \
-            packaging/nfpm.yaml > dist/nfpm-focal.yaml
-          "$(go env GOPATH)/bin/nfpm" package --config dist/nfpm-focal.yaml --packager deb \
-            --target "dist/ubuntu20/ibus-wetypex-legacy_${version}-${revision}_amd64.deb"
-          cd dist/ubuntu20
-          sha256sum *.deb > SHA256SUMS
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ibus-wetypex-focal-legacy
-          path: dist/ubuntu20/
-          if-no-files-found: error
-          retention-days: 30

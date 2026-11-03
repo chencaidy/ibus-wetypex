@@ -27,14 +27,6 @@ def install_ui_resources(archive, data):
     prefix='WeType.app/Contents/MacOS/WeTypeSettings.app/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/assets/modules/'
     with zipfile.ZipFile(archive) as z:
         assets={}
-        system_theme_root=next((path for path in (
-            pathlib.Path('/usr/share/fcitx5/themes'),
-            pathlib.Path('/usr/local/share/fcitx5/themes'))
-            if (path/'wetypex-light/theme.conf').is_file()),None)
-        if system_theme_root:
-            for theme in ('wetypex-light','wetypex-dark'):
-                shutil.copytree(system_theme_root/theme,
-                                data/'fcitx5/themes'/theme,dirs_exist_ok=True)
         for name, original in {'input':'icon_setup_sidebar_keyboard.svg',
                                'voice':'icon_setup_sidebar_microphone.svg',
                                'phrases':'icon_setup_sidebar_changyongyu.svg',
@@ -89,12 +81,6 @@ def install_ui_resources(archive, data):
                      'icon_transfer_android_mini.png','icon_button_connect.png'):
             assets['wetypex/ui/images/'+name]=prefix+'setting/icons/'+name
         candidate=prefix+'candidate/icons/'
-        for theme,variant in (('wetypex-light','light'),
-                              ('wetypex-dark','dark')):
-            assets['fcitx5/themes/'+theme+'/next.svg']=(
-                candidate+'bubble_normal_arrow_lower_'+variant+'.svg')
-            assets['fcitx5/themes/'+theme+'/prev.svg']=(
-                candidate+'bubble_normal_arrow_upper_'+variant+'.svg')
         for name in ('icon_keybar_calculator','icon_keybar_clipboard',
                      'icon_keybar_changyongyu','icon_keybar_symbol','icon_keybar_time',
                      'icon_v_list_enter','icon_v_clipboard_complete',
@@ -133,7 +119,6 @@ def install_ui_resources(archive, data):
         from wechat_emoticons import install_font
         font=install_font(archive,data)
         print('Original WeChat emoticons installed: '+str(font))
-        print('Restart Fcitx5 to load the original emoticon font.')
     except ImportError:
         print('Install fontTools and Pillow to render original WeChat emoticons; text labels remain available.',file=sys.stderr)
 
@@ -277,11 +262,6 @@ def main():
                      'transfer-icons/icon_filetype_folder.svg',
                      'transfer-images/img_connection_pc_to_phone.png']
         missing_ui=[name for name in ui_required if not (ui/name).is_file()]
-        for name in ('fcitx5/themes/wetypex-light/next.svg',
-                     'fcitx5/themes/wetypex-light/prev.svg',
-                     'fcitx5/themes/wetypex-dark/next.svg',
-                     'fcitx5/themes/wetypex-dark/prev.svg'):
-            if not (data/name).is_file():missing_ui.append(name)
         core_ready,core_error=(False,'runtime files are incomplete') if missing else validate_runtime(target)
         runtime_version=''
         try:runtime_version=json.loads((target/'runtime.json').read_text()).get('version','')
@@ -353,7 +333,7 @@ def main():
         old=target.with_name(target.name+'.previous')
         if old.exists():shutil.rmtree(old)
     print('Original runtime prepared: '+str(target))
-    print('Add “WeTypeX” in Fcitx5 settings.')
+    print('Add WeTypeX as an IBus input source in your desktop keyboard settings.')
     return 0
 
 if __name__=='__main__':

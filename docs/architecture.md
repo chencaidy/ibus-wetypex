@@ -2,7 +2,7 @@
 
 ## 目标
 
-WeTypeX 将原版桌面输入核心接入 Fcitx5，同时让 Linux 桌面负责输入上下文、进程隔离、音频、剪贴板和界面。设计目标是保留真实候选、账户和联网服务结果，并避免为了输入法启动完整 Wine 或虚拟机。
+WeTypeX 将原版桌面输入核心接入 IBus，同时让 Linux 桌面负责输入上下文、进程隔离、音频、剪贴板和界面。设计目标是保留真实候选、账户和联网服务结果，并避免为了输入法启动完整 Wine 或虚拟机。
 
 支持范围固定为 Linux x86-64 与原版 macOS 2.2.3.657。原版程序不是普通 Linux 动态库，因此设置过程会校验官方压缩包、提取核心与词典，并生成可由兼容宿主加载的映像和重定位清单。
 
@@ -10,22 +10,20 @@ WeTypeX 将原版桌面输入核心接入 Fcitx5，同时让 Linux 桌面负责�
 
 | 组件 | 职责 |
 | --- | --- |
-| `wetypex.so` | Fcitx5 输入法引擎、按键状态、候选、预编辑和提交 |
+| `ibus-engine-wetypex` | IBus 输入法引擎、按键状态、候选、预编辑和提交 |
 | `wetypex-engine-host` | 加载固定版本原版核心，提供所需 Darwin ABI |
 | `wcwss_bridge.so` | 将原版网络调用桥接到 Linux curl/TLS/WebSocket |
 | `wetypex-backend` | 在 Bubblewrap 中启动持久输入服务 |
 | `wetypex-account` | 执行配对、设备组、同步、语音和传输业务请求 |
 | `wetypex-syncd` | 轮询设备组并交换剪贴板内容 |
 | `wetypex-transfer` | 生成官方二维码、发布临时 CA 与连接角色，并驱动原版 Flurry LAN/WXP2P 文件通道 |
-| `wetypex-settings` | Fcitx5 专用 Qt 设置窗口，与 Fcitx5 配置页共用配置 |
 | `wetypex-settings` | IBus 专用 GTK4 + libadwaita 设置窗口，管理输入、常用语和跨设备同步 |
-| `libwetypexconfig.so` | Fcitx5 Qt6 配置页中的完整设置、账号与同步入口 |
 | `wetypex-ai` | 调用原版 AI 服务并打开问答窗口 |
 | `wetypex-voice` | PipeWire/PulseAudio 流式采集、原版语音引擎会话和结果投递 |
 
 ## 输入路径
 
-每个 Fcitx5 `InputContext` 都拥有独立会话、序号、epoch、候选修订号和本地模式状态。插件通过一行一个 JSON 对象的私有管道向后端发送按键。后端把输入交给原版会话，返回预编辑、候选和提交文本。
+每个 IBus 都拥有独立会话、序号、epoch、候选修订号和本地模式状态。插件通过一行一个 JSON 对象的私有管道向后端发送按键。后端把输入交给原版会话，返回预编辑、候选和提交文本。
 
 核心回调通过 eventfd 唤醒同一服务线程，由该线程生成异步状态快照并发送，保持输入操作和输出的串行顺序。快照携带会话、epoch、当前请求序号和单调更新号，提交文本只排出一次；旧序号、旧 epoch 和重复更新会被前端丢弃。前后端通过 `candidate_updates` 明确协商该能力：支持推送时无需轮询云候选；旧辅助核心仍使用原来的轮询，旧插件也不会收到无法处理的推送。
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize the Fcitx clipboard through the original WeType service."""
+"""Synchronize the clipboard through the original WeType service."""
 import fcntl
 import base64
 import hashlib

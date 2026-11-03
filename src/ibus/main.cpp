@@ -348,6 +348,7 @@ gboolean backendReadable(gint fd, GIOCondition condition, gpointer data) {
       continue;
     if (errno == EAGAIN || errno == EWOULDBLOCK)
       break;
+    g_warning("WeTypeX backend sockets read failed: %s", g_strerror(errno));
     closeBackend(state, true);
     state->backendFailed = true;
     if (state->active)
@@ -385,6 +386,7 @@ gboolean backendWritable(gint fd, GIOCondition condition, gpointer data) {
       continue;
     if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
       return G_SOURCE_CONTINUE;
+    g_warning("WeTypeX backend sockets write failed: %s", g_strerror(errno));
     state->writeSource = 0;
     closeBackend(state, false);
     state->backendFailed = true;
@@ -1137,6 +1139,7 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
 }
 
 void onFocusIn(IBusEngine *engine) {
+  g_debug("onFocusIn");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->focused = true;
   registerProperties(self->state);
@@ -1145,29 +1148,34 @@ void onFocusIn(IBusEngine *engine) {
 }
 
 void onFocusOut(IBusEngine *engine) {
+  g_debug("onFocusOut");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->focused = false;
   activate(self->state);
 }
 
 void onEnable(IBusEngine *engine) {
+  g_debug("onEnable");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->enabled = true;
   activate(self->state);
 }
 
 void onDisable(IBusEngine *engine) {
+  g_debug("onDisable");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->enabled = false;
   activate(self->state);
 }
 
 void onReset(IBusEngine *engine) {
+  g_debug("onReset");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   resetComposition(self->state, self->state->active);
 }
 
 void onPageUp(IBusEngine *engine) {
+  g_debug("onPageUp");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   if (state->candidatePage > 0) {
     state->candidatePage--;
@@ -1177,6 +1185,7 @@ void onPageUp(IBusEngine *engine) {
 }
 
 void onPageDown(IBusEngine *engine) {
+  g_debug("onPageDown");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const int pages = static_cast<int>(
       (state->candidates.size() + state->settings.pageSize - 1) /
@@ -1189,6 +1198,7 @@ void onPageDown(IBusEngine *engine) {
 }
 
 void onCursorUp(IBusEngine *engine) {
+  g_debug("onCursorUp");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   if (state->candidateCursor > 0) {
     state->candidateCursor--;
@@ -1198,6 +1208,7 @@ void onCursorUp(IBusEngine *engine) {
 }
 
 void onCursorDown(IBusEngine *engine) {
+  g_debug("onCursorDown");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   if (state->candidateCursor + 1 < static_cast<int>(state->candidates.size())) {
     state->candidateCursor++;
@@ -1207,17 +1218,21 @@ void onCursorDown(IBusEngine *engine) {
 }
 
 void onCandidateClicked(IBusEngine *engine, guint index, guint, guint) {
+  g_debug("onCandidateClicked");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   selectCandidate(state, static_cast<int>(index));
 }
 
 void onContentType(IBusEngine *engine, guint purpose, guint) {
+  g_debug("onContentType");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   state->contentPurpose = static_cast<int>(purpose);
   activate(state);
 }
 
 void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
+  g_debug("onPropertyActivate");
+
   if (!propertyName)
     return;
 
@@ -1233,6 +1248,7 @@ void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
 }
 
 void onSetCapabilities(IBusEngine *engine, guint capabilities) {
+  g_debug("onSetCapabilities");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->parent.client_capabilities = capabilities;
 }

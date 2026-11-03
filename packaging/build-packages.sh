@@ -7,14 +7,12 @@ output="$project_root/dist"
 stage="$output/root"
 
 mkdir -p "$output"
-find "$output" "$output/arch" "$output/debian" "$output/fedora" "$output/ubuntu20" \
+find "$output" "$output/arch" "$output/ubuntu26" \
     -maxdepth 1 -type f \
     \( -name 'ibus-wetypex-*.tar.gz' -o \
-       -name 'ibus-wetypex-*.tar.zst' -o \
-       -name 'ibus-wetypex-*.rpm' -o \
+       -name 'ibus-wetypex-*.pkg.tar.zst' -o \
        -name 'ibus-wetypex_*.deb' -o \
-       -name 'ibus-wetypex-legacy_*.deb' -o \
-       -name 'ibus-wetypex-*.pkg.tar.zst' \) \
+       -name 'ibus-wetypex-*.tar.zst' \) \
     -delete 2>/dev/null || true
 rm -rf "$stage"
 mkdir -p "$stage"
@@ -23,9 +21,9 @@ mkdir -p "$stage"
 tar --zstd -C "$stage" -cf "$output/ibus-wetypex-${version}-linux-x86_64.tar.zst" .
 
 if command -v nfpm >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
-    "$project_root/packaging/build-native-packages.sh"
+    "$project_root/packaging/build-ubuntu-package.sh"
 else
-    printf '未同时找到 Docker 和 nFPM，跳过原生 deb 与 rpm。\n' >&2
+    printf '未同时找到 Docker 和 nFPM，跳过原生 deb。\n' >&2
 fi
 
 if command -v makepkg >/dev/null 2>&1; then
@@ -40,12 +38,10 @@ fi
     while IFS= read -r -d '' file; do
         digest=$(sha256sum "$file" | cut -d' ' -f1)
         printf '%s  %s\n' "$digest" "$(basename "$file")"
-    done < <(find . ./arch ./debian ./fedora ./ubuntu20 -maxdepth 1 -type f \
+    done < <(find . arch ubuntu26 -maxdepth 1 -type f \
         \( -name 'ibus-wetypex-*.tar.gz' -o \
-           -name 'ibus-wetypex-*.tar.zst' -o \
-           -name 'ibus-wetypex-*.rpm' -o \
+           -name 'ibus-wetypex-*.pkg.tar.zst' -o \
            -name 'ibus-wetypex_*.deb' -o \
-           -name 'ibus-wetypex-legacy_*.deb' -o \
-           -name 'ibus-wetypex-*.pkg.tar.zst' \) \
+           -name 'ibus-wetypex-*.tar.zst' \) \
         -print0 | sort -z)
 ) >"$output/SHA256SUMS"

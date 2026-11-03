@@ -94,7 +94,7 @@ static bool prepareLayerShell() {
                stderr);
   }
 #endif
-  std::fputs("WeTypeX: layer-shell unavailable; using the Fcitx tools menu.\n",
+  std::fputs("WeTypeX: layer-shell unavailable.\n",
              stderr);
   return false;
 }

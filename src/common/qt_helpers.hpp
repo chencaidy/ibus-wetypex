@@ -44,7 +44,7 @@ inline qint64 jsonInteger(const QJsonValue &value, qint64 fallback = 0) {
 }
 
 inline bool settingBool(const QJsonValue &value, bool fallback = false) {
-  // Fcitx configuration pages in older releases saved switches as 0/1.
+  // Configuration pages in older releases saved switches as 0/1.
   return value.isDouble() ? value.toDouble() != 0 : value.toBool(fallback);
 }
 

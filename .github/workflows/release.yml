@@ -50,11 +50,6 @@ jobs:
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
           sudo install "$(go env GOPATH)/bin/nfpm" /usr/local/bin/nfpm
 
-      - name: 构建 Debian 与 Fedora 软件包
-        env:
-          WETYPEX_BUILD_JOBS: "2"
-        run: packaging/build-native-packages.sh
-
       - name: 构建 Ubuntu 26.04 IBus 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
@@ -91,13 +86,11 @@ jobs:
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
-            done < <(find arch debian fedora ubuntu20 ibus . -maxdepth 1 -type f \
+            done < <(find arch ubuntu26 . -maxdepth 1 -type f \
               \( -name 'ibus-wetypex-*.tar.gz' -o \
-                 -name 'ibus-wetypex-*.tar.zst' -o \
-                 -name 'ibus-wetypex-*.rpm' -o \
+                 -name 'ibus-wetypex-*.pkg.tar.zst' -o \
                  -name 'ibus-wetypex_*.deb' -o \
-                 -name 'ibus-wetypex-legacy_*.deb' -o \
-                 -name 'ibus-wetypex-*.pkg.tar.zst' \) \
+                 -name 'ibus-wetypex-*.tar.zst' \) \
               -print0 | sort -z)
           ) > dist/SHA256SUMS
 
@@ -106,13 +99,10 @@ jobs:
         with:
           name: ibus-wetypex-${{ inputs.tag || github.ref_name }}
           path: |
-            dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/arch/ibus-wetypex-*.tar.gz
-            dist/debian/ibus-wetypex_*.deb
-            dist/ibus/ibus-wetypex_*.deb
-            dist/ubuntu20/ibus-wetypex-legacy_*.deb
-            dist/fedora/ibus-wetypex-*.rpm
-            dist/ibus-wetypex-*-linux-x86_64.tar.zst
+            dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/ubuntu26/ibus-wetypex_*.deb
+            dist/ibus-wetypex-*.tar.zst
             dist/SHA256SUMS
 
       - name: 创建 GitHub Release
@@ -121,13 +111,10 @@ jobs:
         shell: bash
         run: |
           files=(
-            dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/arch/ibus-wetypex-*.tar.gz
-            dist/debian/ibus-wetypex_*.deb
-            dist/ibus/ibus-wetypex_*.deb
-            dist/ubuntu20/ibus-wetypex-legacy_*.deb
-            dist/fedora/ibus-wetypex-*.rpm
-            dist/ibus-wetypex-*-linux-x86_64.tar.zst
+            dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/ubuntu26/ibus-wetypex_*.deb
+            dist/ibus-wetypex-*.tar.zst
             dist/SHA256SUMS
           )
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

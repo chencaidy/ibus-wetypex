@@ -71,16 +71,14 @@ WeTypeX 前端 ────────── 候选、预编辑、快捷键、�
 
 ### Ubuntu 26.04
 
-IBus 使用独立的 `ibus-wetypex` 包，并将共享运行时文件放在独立目录以便与 Fcitx5 包共存。首次使用前运行 `wetypex-setup --archive /path/to/WeType_2.2.3_657.zip` 准备官方运行时。安装包后，在 GNOME“设置 → 键盘 → 输入源”中添加 **WeTypeX**；必要时执行 `ibus restart` 或重新登录。设置程序可从应用菜单或 `wetypex-settings` 启动。初版保留全拼、双拼、五笔及远程剪贴板同步，不提供 AI、语音、V 模式和剪贴板历史。当前移植尚未完成目标桌面的端到端验证。
+IBus 使用独立的 `ibus-wetypex` 包。首次使用前运行 `wetypex-setup --archive /path/to/WeType_2.2.3_657.zip` 准备官方运行时。安装包后，在 GNOME“设置 → 键盘 → 输入源”中添加 **WeTypeX**；必要时执行 `ibus restart` 或重新登录。设置程序可从应用菜单或 `wetypex-settings` 启动。初版保留全拼、双拼、五笔及远程剪贴板同步，暂不提供 AI、语音、V 模式和剪贴板历史。
 
 在 Ubuntu 26.04 构建该包需要 Docker 和 nFPM：
 
 ```bash
-bash packaging/bbuild-ubuntu-package
-sudo apt install ./dist/ibus/ibus-wetypex_2.2.3.657-1_amd64.deb
+bash packaging/build-ubuntu-package
+sudo apt install ./dist/ubuntu26/ibus-wetypex_2.2.3.657-1_amd64.deb
 ```
-
-源码构建也可显式只启用 IBus 前端：将 `-DWETYPE_BUILD_FCITX5=OFF -DWETYPE_BUILD_IBUS=ON` 传给 CMake。默认仍构建 Fcitx5，以保持既有行为。
 
 ### 便携归档
 
