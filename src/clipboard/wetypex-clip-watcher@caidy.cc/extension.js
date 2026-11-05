@@ -158,9 +158,12 @@ class Service {
     if (creds.UnixUserID !== Gio.Credentials.new().get_unix_user())
       return false;
     try {
-      return ALLOWED_EXE.includes(
-        GLib.file_read_link(`/proc/${creds.ProcessID}/exe`),
+      // A package upgrade leaves " (deleted)" on the path of a running binary.
+      const exe = GLib.file_read_link(`/proc/${creds.ProcessID}/exe`).replace(
+        / \(deleted\)$/,
+        "",
       );
+      return ALLOWED_EXE.includes(exe);
     } catch (e) {
       return false;
     }
@@ -170,13 +173,57 @@ class Service {
     invocation.return_dbus_error(`${IFACE}.Error.AccessDenied`, "not allowed");
   }
 
+  // The credential lookup itself failed (timeout, busy bus, shutting down).
+  // That says nothing about the caller, so it is a retryable error and must
+  // never cost the client its subscription.
+  _unavailable(invocation) {
+    invocation.return_dbus_error(
+      `${IFACE}.Error.Unavailable`,
+      "cannot verify caller, try again",
+    );
+  }
+
+  // Common gate for every call after Subscribe. Re-checks credentials on every
+  // call: a client can exec another program while keeping the same bus
+  // connection. Only a caller that is positively not allowed is dropped.
+  _guard(invocation, fn) {
+    const sender = invocation.get_sender();
+    if (!this._subs.has(sender)) {
+      this._deny(invocation);
+      return;
+    }
+    this._getCreds(sender, (creds) => {
+      if (!creds) {
+        this._unavailable(invocation);
+        return;
+      }
+      if (!this._authorized(creds)) {
+        this._drop(sender);
+        this._deny(invocation);
+        return;
+      }
+      // The subscription may have been dropped or the service torn down while
+      // the lookup was in flight.
+      if (this._destroyed || !this._subs.has(sender)) {
+        this._deny(invocation);
+        return;
+      }
+      fn();
+    });
+  }
+
   SubscribeAsync(_params, invocation) {
     const sender = invocation.get_sender();
     this._getCreds(sender, (creds) => {
+      if (!creds) {
+        this._unavailable(invocation);
+        return;
+      }
       if (!this._authorized(creds)) {
         this._deny(invocation);
         return;
       }
+      // Idempotent: a client may safely subscribe again.
       if (!this._subs.has(sender)) {
         // removed automatically when the client exits
         const id = Gio.bus_watch_name_on_connection(
@@ -193,19 +240,7 @@ class Service {
   }
 
   GetTextAsync([serial], invocation) {
-    const sender = invocation.get_sender();
-    if (!this._subs.has(sender)) {
-      this._deny(invocation);
-      return;
-    }
-    // Re-check credentials on every call: a client can exec another program
-    // while keeping the same bus connection
-    this._getCreds(sender, (creds) => {
-      if (!this._authorized(creds)) {
-        this._drop(sender);
-        this._deny(invocation);
-        return;
-      }
+    this._guard(invocation, () => {
       if (this._data === null || serial !== this._serial) {
         invocation.return_dbus_error(
           `${IFACE}.Error.Expired`,
@@ -225,17 +260,7 @@ class Service {
   }
 
   GetImageAsync([serial], invocation) {
-    const sender = invocation.get_sender();
-    if (!this._subs.has(sender)) {
-      this._deny(invocation);
-      return;
-    }
-    this._getCreds(sender, (creds) => {
-      if (!this._authorized(creds)) {
-        this._drop(sender);
-        this._deny(invocation);
-        return;
-      }
+    this._guard(invocation, () => {
       if (this._data === null || serial !== this._serial) {
         invocation.return_dbus_error(
           `${IFACE}.Error.Expired`,
@@ -255,17 +280,7 @@ class Service {
   }
 
   SetTextAsync([text], invocation) {
-    const sender = invocation.get_sender();
-    if (!this._subs.has(sender)) {
-      this._deny(invocation);
-      return;
-    }
-    this._getCreds(sender, (creds) => {
-      if (!this._authorized(creds)) {
-        this._drop(sender);
-        this._deny(invocation);
-        return;
-      }
+    this._guard(invocation, () => {
       if (typeof text !== "string" || text.length === 0) {
         invocation.return_dbus_error(
           "org.freedesktop.DBus.Error.InvalidArgs",
@@ -292,17 +307,7 @@ class Service {
   }
 
   SetImageAsync([data], invocation) {
-    const sender = invocation.get_sender();
-    if (!this._subs.has(sender)) {
-      this._deny(invocation);
-      return;
-    }
-    this._getCreds(sender, (creds) => {
-      if (!this._authorized(creds)) {
-        this._drop(sender);
-        this._deny(invocation);
-        return;
-      }
+    this._guard(invocation, () => {
       const bytes = data instanceof Uint8Array ? data : null;
       if (!bytes || bytes.length === 0) {
         invocation.return_dbus_error(
@@ -366,13 +371,18 @@ class Service {
 
     // Unicast, metadata only, no content
     for (const name of this._subs.keys()) {
-      Gio.DBus.session.emit_signal(
-        name,
-        PATH,
-        IFACE,
-        "Changed",
-        new GLib.Variant("(uus)", [this._serial, length, mime]),
-      );
+      try {
+        Gio.DBus.session.emit_signal(
+          name,
+          PATH,
+          IFACE,
+          "Changed",
+          new GLib.Variant("(uus)", [this._serial, length, mime]),
+        );
+      } catch (e) {
+        // One unreachable subscriber must not stop the others.
+        console.warn(`WeTypeXClipWatcher: cannot notify ${name}: ${e}`);
+      }
     }
   }
 

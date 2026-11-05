@@ -3,6 +3,10 @@
 // The GNOME Shell extension is the clipboard source: it reports local copies
 // (Changed), we fetch the content once, and this daemon uploads it. Remote
 // content goes back through the same extension (SetText/SetImage).
+//
+// The extension may be disabled/enabled or restarted at any time. The daemon
+// watches its bus name: whenever a new owner appears it re-verifies the owner
+// and subscribes again; while it is absent, synchronization is paused.
 #include <gio/gio.h>
 #include <glib-unix.h>
 #include <glib.h>
@@ -28,6 +32,8 @@ static const char *PATH = "/org/gnome/Shell/Extensions/WeTypeXClipWatcher";
 static const char *IFACE = "org.gnome.Shell.Extensions.WeTypeXClipWatcher";
 static const char *ERR_EXPIRED = "org.gnome.Shell.Extensions.WeTypeXClipWatcher.Error.Expired";
 static const char *ERR_WRONG_TYPE = "org.gnome.Shell.Extensions.WeTypeXClipWatcher.Error.WrongType";
+static const char *ERR_ACCESS_DENIED = "org.gnome.Shell.Extensions.WeTypeXClipWatcher.Error.AccessDenied";
+static const char *ERR_UNAVAILABLE = "org.gnome.Shell.Extensions.WeTypeXClipWatcher.Error.Unavailable";
 static const char *SHELL_EXE = "/usr/bin/gnome-shell";
 
 static const guint MAX_TEXT_BYTES = 64 * 1024;
@@ -45,13 +51,6 @@ static const guint64 CLIPBOARD_FUNCTION = 1;
 
 static std::string short_digest(const std::string &digest) { return digest.substr(0, 12); }
 
-struct LocalClip {
-  bool known = false;
-  std::string kind; // "text" or "image"
-  std::string data;
-  std::string digest;
-};
-
 struct SyncState {
   guint64 group_id = 0;
   guint64 remote_version = 0;
@@ -61,17 +60,40 @@ struct SyncState {
   bool baseline_pending = true;
 };
 
+struct LocalClip {
+  bool known = false;
+  std::string kind; // "text", "image" or "empty"
+  std::string data;
+  std::string digest;
+};
+
 struct Daemon {
-  GDBusConnection *conn = nullptr;
+  // Run mode
+  bool once = false; // --once: one sync round, then exit
+  int exit_code = 0; // process exit status, set by the paths that quit the loop
+
+  // Main loop and bus resources (created in main, released on exit)
   GMainLoop *loop = nullptr;
-  guint subscription = 0;
-  guint timer = 0;
-  bool once = false;
+  GDBusConnection *conn = nullptr;
+  gulong closed_handler = 0; // "closed" signal on conn
+  guint subscription = 0;    // match rule for the Changed signal
+  guint name_watch = 0;      // watch on the extension's bus name
+  guint timer = 0;           // periodic sync_tick source, 0 once removed
+
+  // Extension link
+  std::string ext_owner;      // unique name of the current owner, empty when absent
+  bool ext_ready = false;     // owner verified and Subscribe succeeded
+  bool attach_logged = false; // the current attach failure was already reported
+  guint64 epoch = 0;          // bumped whenever the extension appears, vanishes or drops our subscription
+
+  // Configuration
   std::string state_dir;
   std::string account_tool;
+
+  // Sync state
+  SyncState sync;            // persisted cursors and baseline (sync-runtime.json)
+  LocalClip local;           // what the extension last reported as the local clipboard
   std::string failed_digest; // last upload the service refused, to log it once
-  SyncState sync;
-  LocalClip local;
 };
 
 static std::string sha256_hex(const std::string &data) {
@@ -228,24 +250,67 @@ static wire::Json call_account(const Daemon &daemon, const std::vector<std::stri
   return json;
 }
 
-static bool verify_owner(GDBusConnection *conn) {
-  g_autoptr(GError) err = nullptr;
-  g_autoptr(GVariant) r = g_dbus_connection_call_sync(
-      conn, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetNameOwner",
-      g_variant_new("(s)", NAME), G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, &err);
-  if (!r) {
-    g_warning("Extension is not running: %s", err->message);
-    return false;
-  }
-  const gchar *owner = nullptr;
-  g_variant_get(r, "(&s)", &owner);
+// ---------------------------------------------------------------------------
+// Extension connection management
+// ---------------------------------------------------------------------------
 
-  g_autoptr(GError) err2 = nullptr;
+static void remember_local(Daemon &daemon, const char *kind, const std::string &data) {
+  daemon.local.known = true;
+  daemon.local.kind = kind;
+  daemon.local.data = data;
+  daemon.local.digest = sha256_hex(data);
+}
+
+// The extension process is gone or going away: expected while it restarts.
+static bool is_service_gone(const GError *err) {
+  return g_error_matches(err, G_DBUS_ERROR, G_DBUS_ERROR_SERVICE_UNKNOWN) ||
+         g_error_matches(err, G_DBUS_ERROR, G_DBUS_ERROR_NAME_HAS_NO_OWNER) ||
+         g_error_matches(err, G_DBUS_ERROR, G_DBUS_ERROR_NO_REPLY) ||
+         g_error_matches(err, G_DBUS_ERROR, G_DBUS_ERROR_DISCONNECTED) ||
+         g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CLOSED) || g_error_matches(err, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+}
+
+// A copy that was replaced by a newer one (or whose TTL elapsed) before we
+// fetched it; the newer Changed signal already carries the fresh serial. A
+// WrongType race (content replaced by the other kind) is equally harmless, and
+// so are failures caused by the extension restarting.
+static bool is_remote_err(GError *err, const char *name) {
+  if (!g_dbus_error_is_remote_error(err))
+    return false;
+  g_autofree gchar *remote = g_dbus_error_get_remote_error(err);
+  return g_strcmp0(remote, name) == 0;
+}
+
+// Unavailable: the extension could not verify us this time (e.g. a credential
+// lookup timed out). It keeps the subscription, so just try again later.
+static bool is_ignorable(GError *err) {
+  if (is_service_gone(err))
+    return true;
+  return is_remote_err(err, ERR_EXPIRED) || is_remote_err(err, ERR_WRONG_TYPE) || is_remote_err(err, ERR_UNAVAILABLE);
+}
+
+// The extension dropped our subscription without changing owner (it answers
+// AccessDenied once we are no longer in its table). Subscribe is idempotent on
+// its side, so go back to the unattached state: the next tick re-verifies the
+// owner and subscribes again. Cursors are untouched, nothing is lost.
+static void request_resubscribe(Daemon &daemon) {
+  if (!daemon.ext_ready)
+    return;
+  g_warning("Subscription lost (access denied), resubscribing");
+  daemon.ext_ready = false;
+  daemon.attach_logged = false;
+  daemon.epoch++;
+}
+
+// The owner must be the real gnome-shell, otherwise any process could claim the
+// name and receive our clipboard.
+static bool verify_owner(GDBusConnection *conn, const gchar *owner) {
+  g_autoptr(GError) err = nullptr;
   g_autoptr(GVariant) c = g_dbus_connection_call_sync(
       conn, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetConnectionCredentials",
-      g_variant_new("(s)", owner), G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, &err2);
+      g_variant_new("(s)", owner), G_VARIANT_TYPE("(a{sv})"), G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, &err);
   if (!c) {
-    g_warning("Failed to get credentials: %s", err2->message);
+    g_debug("Failed to get credentials: %s", err->message);
     return false;
   }
   g_autoptr(GVariant) dict = g_variant_get_child_value(c, 0);
@@ -255,30 +320,95 @@ static bool verify_owner(GDBusConnection *conn) {
 
   g_autofree gchar *link = g_strdup_printf("/proc/%u/exe", pid);
   g_autofree gchar *exe = g_file_read_link(link, nullptr);
-  return g_strcmp0(exe, SHELL_EXE) == 0;
+  if (!exe)
+    return false;
+  // A package upgrade leaves " (deleted)" on the path of the running binary.
+  std::string path = exe;
+  static const std::string deleted_suffix = " (deleted)";
+  if (path.size() > deleted_suffix.size() &&
+      path.compare(path.size() - deleted_suffix.size(), deleted_suffix.size(), deleted_suffix) == 0)
+    path.resize(path.size() - deleted_suffix.size());
+  return path == SHELL_EXE;
 }
 
-// A copy that was replaced by a newer one (or whose TTL elapsed) before we
-// fetched it; the newer Changed signal already carries the fresh serial. A
-// WrongType race (content replaced by the other kind) is equally harmless.
-static bool is_ignorable(GError *err) {
-  if (!g_dbus_error_is_remote_error(err))
+// Verify the current owner and subscribe. Safe to call repeatedly: it is a
+// no-op once attached, and a failure (for instance the name is already owned
+// but the object is not exported yet) is simply retried on the next tick.
+static bool try_attach(Daemon &daemon) {
+  if (daemon.ext_ready)
+    return true;
+  if (daemon.ext_owner.empty())
     return false;
-  g_autofree gchar *remote = g_dbus_error_get_remote_error(err);
-  return g_strcmp0(remote, ERR_EXPIRED) == 0 || g_strcmp0(remote, ERR_WRONG_TYPE) == 0;
+
+  if (!verify_owner(daemon.conn, daemon.ext_owner.c_str())) {
+    if (!daemon.attach_logged) {
+      daemon.attach_logged = true;
+      g_warning("Owner %s of %s is not %s, refusing to subscribe", daemon.ext_owner.c_str(), NAME, SHELL_EXE);
+    }
+    return false;
+  }
+
+  g_autoptr(GError) err = nullptr;
+  g_autoptr(GVariant) reply =
+      g_dbus_connection_call_sync(daemon.conn, daemon.ext_owner.c_str(), PATH, IFACE, "Subscribe", nullptr, nullptr,
+                                  G_DBUS_CALL_FLAGS_NONE, 5000, nullptr, &err);
+  if (!reply) {
+    if (!daemon.attach_logged) {
+      daemon.attach_logged = true;
+      g_warning("Subscribe failed, will retry: %s", err->message);
+    } else {
+      g_debug("Subscribe still failing: %s", err->message);
+    }
+    return false;
+  }
+
+  // The new instance has its own serials and knows nothing of what was copied
+  // before. Start from an empty local view: the next sync round records it
+  // without uploading, and later copies are observed as new events.
+  remember_local(daemon, "empty", "");
+  daemon.ext_ready = true;
+  daemon.attach_logged = false;
+  g_message("Connected to clipboard extension (%s)", daemon.ext_owner.c_str());
+  return true;
 }
+
+static void on_name_appeared(GDBusConnection *, const gchar *, const gchar *owner, gpointer user_data) {
+  auto *daemon = static_cast<Daemon *>(user_data);
+  daemon->epoch++;
+  daemon->ext_owner = owner ? owner : "";
+  daemon->ext_ready = false; // a new owner has an empty subscriber table
+  daemon->attach_logged = false;
+  try_attach(*daemon);
+}
+
+static void on_name_vanished(GDBusConnection *, const gchar *, gpointer user_data) {
+  auto *daemon = static_cast<Daemon *>(user_data);
+  daemon->epoch++;
+  if (daemon->ext_ready)
+    g_warning("Clipboard extension went away, waiting for it to return");
+  daemon->ext_owner.clear();
+  daemon->ext_ready = false;
+  daemon->attach_logged = false;
+  remember_local(*daemon, "empty", "");
+}
+
+static void on_connection_closed(GDBusConnection *, gboolean, GError *error, gpointer user_data) {
+  auto *daemon = static_cast<Daemon *>(user_data);
+  g_warning("Session bus connection closed: %s", error ? error->message : "unknown reason");
+  daemon->exit_code = 1; // non-zero so a supervisor restarts us on a new bus
+  if (daemon->loop)
+    g_main_loop_quit(daemon->loop);
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard fetch / set
+// ---------------------------------------------------------------------------
 
 struct Fetch {
   Daemon *daemon;
   std::string mime;
+  guint64 epoch; // extension instance the request was sent to
 };
-
-static void remember_local(Daemon &daemon, const char *kind, const std::string &data) {
-  daemon.local.known = true;
-  daemon.local.kind = kind;
-  daemon.local.data = data;
-  daemon.local.digest = sha256_hex(data);
-}
 
 // A remote copy we wrote is now the local one. The extension suppresses the
 // echo of its own writes, so both views have to be updated here or the next
@@ -294,8 +424,13 @@ static void on_text_fetched(GObject *source, GAsyncResult *result, gpointer data
   const std::unique_ptr<Fetch> fetch(static_cast<Fetch *>(data));
   g_autoptr(GError) err = nullptr;
   g_autoptr(GVariant) reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, &err);
+  // The extension restarted while the request was in flight: stale answer.
+  if (fetch->epoch != fetch->daemon->epoch || !fetch->daemon->ext_ready)
+    return;
   if (!reply) {
-    if (!is_ignorable(err))
+    if (is_remote_err(err, ERR_ACCESS_DENIED))
+      request_resubscribe(*fetch->daemon);
+    else if (!is_ignorable(err))
       g_warning("GetText failed: %s", err->message);
     return;
   }
@@ -317,8 +452,12 @@ static void on_image_fetched(GObject *source, GAsyncResult *result, gpointer dat
   const std::unique_ptr<Fetch> fetch(static_cast<Fetch *>(data));
   g_autoptr(GError) err = nullptr;
   g_autoptr(GVariant) reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(source), result, &err);
+  if (fetch->epoch != fetch->daemon->epoch || !fetch->daemon->ext_ready)
+    return;
   if (!reply) {
-    if (!is_ignorable(err))
+    if (is_remote_err(err, ERR_ACCESS_DENIED))
+      request_resubscribe(*fetch->daemon);
+    else if (!is_ignorable(err))
       g_warning("GetImage failed: %s", err->message);
     return;
   }
@@ -345,28 +484,36 @@ static void on_image_fetched(GObject *source, GAsyncResult *result, gpointer dat
 static void on_changed(GDBusConnection *conn, const gchar *, const gchar *, const gchar *, const gchar *,
                        GVariant *params, gpointer user_data) {
   auto *daemon = static_cast<Daemon *>(user_data);
+  // A late signal from an instance we are no longer attached to.
+  if (!daemon->ext_ready || daemon->ext_owner.empty())
+    return;
   guint32 serial = 0, len = 0;
   const gchar *mime = nullptr;
   g_variant_get(params, "(uu&s)", &serial, &len, &mime);
   if (!mime)
     return;
   g_debug("clipboard changed: serial=%u mime=%s length=%u", serial, mime, len);
+  // Talk to the verified unique name, so a replacement owner can never answer
+  // a request meant for the previous instance.
+  const gchar *dest = daemon->ext_owner.c_str();
   // Never fetch what would be rejected on arrival anyway.
   if (g_str_has_prefix(mime, "image/")) {
     if (len > MAX_IMAGE_BYTES) {
       g_debug("ignoring image: %u bytes, max %u", len, MAX_IMAGE_BYTES);
       return;
     }
-    g_dbus_connection_call(conn, NAME, PATH, IFACE, "GetImage", g_variant_new("(u)", serial), G_VARIANT_TYPE("(ay)"),
-                           G_DBUS_CALL_FLAGS_NONE, -1, nullptr, on_image_fetched, new Fetch{daemon, mime});
+    g_dbus_connection_call(conn, dest, PATH, IFACE, "GetImage", g_variant_new("(u)", serial), G_VARIANT_TYPE("(ay)"),
+                           G_DBUS_CALL_FLAGS_NONE, -1, nullptr, on_image_fetched,
+                           new Fetch{daemon, mime, daemon->epoch});
     return;
   }
   if (len > MAX_TEXT_BYTES) {
     g_debug("ignoring text: %u bytes, max %u", len, MAX_TEXT_BYTES);
     return;
   }
-  g_dbus_connection_call(conn, NAME, PATH, IFACE, "GetText", g_variant_new("(u)", serial), G_VARIANT_TYPE("(s)"),
-                         G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, on_text_fetched, new Fetch{daemon, mime});
+  g_dbus_connection_call(conn, dest, PATH, IFACE, "GetText", g_variant_new("(u)", serial), G_VARIANT_TYPE("(s)"),
+                         G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, on_text_fetched,
+                         new Fetch{daemon, mime, daemon->epoch});
 }
 
 // The local copy a remote write must not replace when it completes.
@@ -382,23 +529,37 @@ static bool local_unchanged(const Daemon &daemon, const LocalMark &expected) {
 // Writing through the extension also suppresses the echo of the copy, so the
 // digest recorded by the caller stays authoritative.
 static bool set_remote_text(Daemon &daemon, const std::string &text, const LocalMark &expected) {
+  if (!daemon.ext_ready) {
+    g_debug("skipping remote text: extension not connected");
+    return false;
+  }
   if (!local_unchanged(daemon, expected)) {
     g_debug("skipping remote text: the local clipboard changed meanwhile");
     return false;
   }
   g_debug("calling SetText: %zu bytes", text.size());
   g_autoptr(GError) err = nullptr;
-  g_autoptr(GVariant) reply =
-      g_dbus_connection_call_sync(daemon.conn, NAME, PATH, IFACE, "SetText", g_variant_new("(s)", text.c_str()),
-                                  nullptr, G_DBUS_CALL_FLAGS_NONE, 5000, nullptr, &err);
+  g_autoptr(GVariant) reply = g_dbus_connection_call_sync(daemon.conn, daemon.ext_owner.c_str(), PATH, IFACE, "SetText",
+                                                          g_variant_new("(s)", text.c_str()), nullptr,
+                                                          G_DBUS_CALL_FLAGS_NONE, 5000, nullptr, &err);
   if (!reply) {
-    g_warning("SetText failed: %s", err->message);
+    // The cursor does not advance, so the message is retried after reconnect.
+    if (is_remote_err(err, ERR_ACCESS_DENIED))
+      request_resubscribe(daemon);
+    else if (is_ignorable(err))
+      g_debug("SetText failed, will retry: %s", err->message);
+    else
+      g_warning("SetText failed: %s", err->message);
     return false;
   }
   return true;
 }
 
 static bool set_remote_image(Daemon &daemon, const std::string &image, const LocalMark &expected) {
+  if (!daemon.ext_ready) {
+    g_debug("skipping remote image: extension not connected");
+    return false;
+  }
   if (!local_unchanged(daemon, expected)) {
     g_debug("skipping remote image: the local clipboard changed meanwhile");
     return false;
@@ -408,10 +569,16 @@ static bool set_remote_image(Daemon &daemon, const std::string &image, const Loc
   GVariant *payload = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, image.data(), image.size(), 1);
   g_autoptr(GVariant) reply = nullptr;
   g_autoptr(GError) err = nullptr;
-  reply = g_dbus_connection_call_sync(daemon.conn, NAME, PATH, IFACE, "SetImage", g_variant_new("(@ay)", payload),
-                                      nullptr, G_DBUS_CALL_FLAGS_NONE, 5000, nullptr, &err);
+  reply = g_dbus_connection_call_sync(daemon.conn, daemon.ext_owner.c_str(), PATH, IFACE, "SetImage",
+                                      g_variant_new("(@ay)", payload), nullptr, G_DBUS_CALL_FLAGS_NONE, 5000, nullptr,
+                                      &err);
   if (!reply) {
-    g_warning("SetImage failed: %s", err->message);
+    if (is_remote_err(err, ERR_ACCESS_DENIED))
+      request_resubscribe(daemon);
+    else if (is_ignorable(err))
+      g_debug("SetImage failed, will retry: %s", err->message);
+    else
+      g_warning("SetImage failed: %s", err->message);
     return false;
   }
   return true;
@@ -561,8 +728,24 @@ static bool sync_once(Daemon &daemon) {
 
 static gboolean sync_tick(gpointer data) {
   auto *daemon = static_cast<Daemon *>(data);
+
+  // Without the extension there is nothing to read from or write to, and the
+  // cursors must not move: pause until it is back (this also retries a
+  // Subscribe that failed because the object was not exported yet).
+  if (!daemon->ext_ready && !try_attach(*daemon)) {
+    if (daemon->once) {
+      g_warning("Clipboard extension is not available");
+      daemon->exit_code = 1;
+      daemon->timer = 0; // the source is removed by returning below
+      g_main_loop_quit(daemon->loop);
+      return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+  }
+
   const bool ok = sync_once(*daemon);
   if (daemon->once) {
+    daemon->timer = 0;
     g_main_loop_quit(daemon->loop);
     return G_SOURCE_REMOVE;
   }
@@ -635,29 +818,31 @@ int main(int argc, char **argv) {
     g_warning("Failed to connect to session bus: %s", err->message);
     return 1;
   }
-  if (!verify_owner(daemon.conn))
-    return 1;
+  // Leave the exit path to us so cleanup runs and the exit code is explicit.
+  g_dbus_connection_set_exit_on_close(daemon.conn, FALSE);
+
+  daemon.loop = g_main_loop_new(nullptr, FALSE);
+  daemon.closed_handler = g_signal_connect(daemon.conn, "closed", G_CALLBACK(on_connection_closed), &daemon);
 
   // Match the signal before becoming an authorized subscriber: the service
   // only unicasts Changed to subscribers, so nothing is emitted to us until
   // Subscribe succeeds, and no copy slips through the gap in between.
+  // The sender is the well-known name, which GDBus keeps resolving across
+  // owner changes, so this rule survives extension restarts.
   daemon.subscription = g_dbus_connection_signal_subscribe(daemon.conn, NAME, IFACE, "Changed", PATH, nullptr,
                                                            G_DBUS_SIGNAL_FLAGS_NONE, on_changed, &daemon, nullptr);
   if (daemon.subscription == 0) {
     g_warning("Cannot subscribe to the Changed signal");
+    g_signal_handler_disconnect(daemon.conn, daemon.closed_handler);
+    g_main_loop_unref(daemon.loop);
     return 1;
   }
 
-  g_autoptr(GError) err_sub = nullptr;
-  g_autoptr(GVariant) r_sub = g_dbus_connection_call_sync(daemon.conn, NAME, PATH, IFACE, "Subscribe", nullptr, nullptr,
-                                                          G_DBUS_CALL_FLAGS_NONE, 5000, nullptr, &err_sub);
-  if (!r_sub) {
-    g_warning("Subscription rejected: %s", err_sub->message);
-    g_dbus_connection_signal_unsubscribe(daemon.conn, daemon.subscription);
-    return 1;
-  }
+  // Verification and Subscribe happen in the name callbacks, every time the
+  // extension (re)appears. Starting before the extension is fine: we wait.
+  daemon.name_watch = g_bus_watch_name_on_connection(daemon.conn, NAME, G_BUS_NAME_WATCHER_FLAGS_NONE, on_name_appeared,
+                                                     on_name_vanished, &daemon, nullptr);
 
-  daemon.loop = g_main_loop_new(nullptr, FALSE);
   // Quit through the main loop so the cleanup below still runs.
   g_unix_signal_add(SIGINT, quit_loop, daemon.loop);
   g_unix_signal_add(SIGTERM, quit_loop, daemon.loop);
@@ -667,9 +852,11 @@ int main(int argc, char **argv) {
 
   if (daemon.timer)
     g_source_remove(daemon.timer);
+  g_bus_unwatch_name(daemon.name_watch);
   g_dbus_connection_signal_unsubscribe(daemon.conn, daemon.subscription);
+  g_signal_handler_disconnect(daemon.conn, daemon.closed_handler);
   g_main_loop_unref(daemon.loop);
   g_clear_object(&daemon.conn);
   close(lock);
-  return 0;
+  return daemon.exit_code;
 }
