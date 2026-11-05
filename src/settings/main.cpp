@@ -466,14 +466,21 @@ void on_delete_phrase(GtkButton *button, gpointer) {
 }
 
 void reload_phrases() {
-  if (!app.phrase_group)
+  if (!app.phrase_group) {
+    g_debug("phrase reload skipped: page group is unavailable");
     return;
+  }
   clear_phrase_rows();
 
   request_hotword_list([](EngineReply reply) {
-    if (!app.phrase_group)
+    if (!app.phrase_group) {
+      g_debug("phrase response ignored: page was closed");
       return;
+    }
     clear_phrase_rows();
+    g_debug("%s", (std::string("phrase response received: ok=") + (reply.ok ? "true" : "false") + ", bytes=" +
+                   std::to_string(reply.json.size()) + (reply.error.empty() ? "" : ", error=" + reply.error))
+                      .c_str());
     if (!reply.ok)
       return;
     auto json = wire::parse(reply.json);
@@ -528,6 +535,7 @@ void reload_phrases() {
       adw_preferences_group_add(ADW_PREFERENCES_GROUP(app.phrase_group), empty);
       app.phrase_rows.push_back(empty);
     }
+    g_debug("%s", (std::string("phrase list rendered: ") + std::to_string(count) + " entries").c_str());
   });
 }
 

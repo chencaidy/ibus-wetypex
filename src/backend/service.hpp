@@ -441,11 +441,12 @@ static void service_loop() {
     } else if (op == "group_sync") {
       const auto group = wire::number(request.get(), "group_id");
       const auto functions = wire::number(request.get(), "func_switch");
+      const auto phraseVersion = wire::number(request.get(), "phrase_version");
       if (!getenv("WETYPE_NETWORK_LIVE") || group <= 0 || functions < 0) {
         wire::put(response.get(), "error",
                   std::string("network disabled or invalid device group"));
       } else {
-        configure_group_sync(group, functions, 0, 0);
+        configure_group_sync(group, functions, phraseVersion, 0);
         // The native core schedules synchronization asynchronously. This
         // acknowledges the request, not a completed dictionary download.
         wire::boolean(response.get(), "requested", true);

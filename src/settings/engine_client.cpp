@@ -23,19 +23,27 @@ namespace {
 
 constexpr std::size_t kMaxResponse = 1 << 20;
 
+std::string request_operation(const std::string &request) {
+  auto json = wire::parse(request);
+  return json ? wire::str(json.get(), "op") : "invalid";
+}
+
 std::string control_socket_path() {
-  gchar *path = g_build_filename(g_get_user_data_dir(), "wetypex",
-                                 "state", "control.sock", nullptr);
+  const char *state_dir = g_getenv("WETYPE_STATE_DIR");
+  gchar *path = state_dir && *state_dir
+                    ? g_build_filename(state_dir, "control.sock", nullptr)
+                    : g_build_filename(g_get_user_data_dir(), "wetypex", "state", "control.sock", nullptr);
   std::string result(path);
   g_free(path);
   return result;
 }
 
 std::string socket_request(const std::string &request, std::string *error) {
+  const std::string path = control_socket_path();
+  g_debug("connecting to control socket: %s", path.c_str());
   GSocketClient *client = g_socket_client_new();
   g_socket_client_set_timeout(client, 2);
-  GSocketAddress *address =
-      g_unix_socket_address_new(control_socket_path().c_str());
+  GSocketAddress *address = g_unix_socket_address_new(path.c_str());
   GError *err = nullptr;
   GSocketConnection *connection = g_socket_client_connect(
       client, G_SOCKET_CONNECTABLE(address), nullptr, &err);
@@ -43,6 +51,7 @@ std::string socket_request(const std::string &request, std::string *error) {
   if (!connection) {
     if (error)
       *error = err ? err->message : "input core is not running";
+    g_debug("connect failed: %s", error->c_str());
     g_clear_error(&err);
     g_object_unref(client);
     return {};
@@ -72,12 +81,16 @@ std::string socket_request(const std::string &request, std::string *error) {
   if (!sent || response.empty()) {
     if (error)
       *error = err ? err->message : "input core did not respond";
+    g_debug("%s",
+            (std::string(!sent ? "write failed: " : "no response: ") + (error ? *error : std::string("unknown error")))
+                .c_str());
   } else {
     const auto newline = response.find('\n');
     if (newline != std::string::npos)
       response.erase(newline);
     if (error)
       error->clear();
+    g_debug("%s", ("response received (" + std::to_string(response.size()) + " bytes)").c_str());
   }
   g_clear_error(&err);
   g_io_stream_close(G_IO_STREAM(connection), nullptr, nullptr);
@@ -122,6 +135,7 @@ bool read_line_fd(int fd, std::string &pending, std::string &line,
 std::string backend_request(const std::string &request, std::string *error) {
   const char *configured = g_getenv("WETYPE_BACKEND_LAUNCHER");
   const char *tool = configured && *configured ? configured : WETYPE_BACKEND;
+  g_debug("%s", ("starting backend " + std::string(tool) + " for " + request_operation(request)).c_str());
   GSubprocessLauncher *launcher =
       g_subprocess_launcher_new(static_cast<GSubprocessFlags>(
           G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE));
@@ -132,6 +146,8 @@ std::string backend_request(const std::string &request, std::string *error) {
   if (!process) {
     if (error)
       *error = err ? err->message : "unable to start the input core";
+    g_debug("%s",
+            ("backend spawn failed: " + (error ? *error : std::string("unable to start the input core"))).c_str());
     g_clear_error(&err);
     return {};
   }
@@ -164,6 +180,7 @@ std::string backend_request(const std::string &request, std::string *error) {
   if (!ready) {
     if (error)
       *error = "输入核心启动超时";
+    g_debug("backend did not send its ready event before timeout");
     g_subprocess_force_exit(process);
     g_subprocess_wait(process, nullptr, nullptr);
     g_object_unref(process);
@@ -192,6 +209,10 @@ std::string backend_request(const std::string &request, std::string *error) {
   } else if (error) {
     error->clear();
   }
+  g_debug("%s", (!sent || response.empty()
+                     ? "backend request failed: " + (error ? *error : std::string("input core did not respond"))
+                     : "backend response received (" + std::to_string(response.size()) + " bytes)")
+                    .c_str());
   g_clear_error(&err);
   const char quit[] = "{\"op\":\"quit\",\"session\":1,\"seq\":0}\n";
   gsize ignored = 0;
@@ -204,9 +225,13 @@ std::string backend_request(const std::string &request, std::string *error) {
 }
 
 std::string run_request(const std::string &request, std::string *error) {
+  g_debug("%s", ("request started: " + request_operation(request)).c_str());
   std::string reply = socket_request(request, error);
-  if (!reply.empty())
+  if (!reply.empty()) {
+    g_debug("request completed through control socket");
     return reply;
+  }
+  g_debug("falling back to a temporary backend process");
   return backend_request(request, error);
 }
 
@@ -218,6 +243,7 @@ struct Job {
 
 gboolean deliver(gpointer data) {
   auto *job = static_cast<Job *>(data);
+  g_debug("%s", ("delivering " + request_operation(job->request) + " result to GTK").c_str());
   if (job->done)
     job->done(std::move(job->reply));
   return G_SOURCE_REMOVE;
@@ -230,9 +256,21 @@ void start_request(std::string request, EngineCallback done) {
   std::thread([job] {
     std::string error;
     const std::string reply = run_request(job->request, &error);
-    job->reply.ok = !reply.empty();
+    if (!reply.empty()) {
+      auto response = wire::parse(reply);
+      if (!response || !json_object_is_type(response.get(), json_type_object)) {
+        error = "输入核心返回无效响应";
+      } else if (auto *failure = wire::get(response.get(), "error");
+                 failure && json_object_is_type(failure, json_type_string)) {
+        error = wire::str(response.get(), "error");
+      }
+    }
+    job->reply.ok = !reply.empty() && error.empty();
     job->reply.json = reply;
     job->reply.error = error;
+    g_debug("%s", ("request finished: " + request_operation(job->request) +
+                   ", ok=" + (job->reply.ok ? "true" : "false") + (error.empty() ? "" : ", error=" + error))
+                      .c_str());
     g_idle_add_full(G_PRIORITY_DEFAULT, deliver, job, free_job);
   }).detach();
 }

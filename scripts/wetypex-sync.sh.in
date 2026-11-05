@@ -36,7 +36,8 @@ def main():
     if not functions & 6 and not refresh_state:
         raise ValueError("个人词库和常用语同步均未开启，请先开启对应功能")
     request = {"session": 1, "seq": time.time_ns(), "epoch": 1, "op": "group_sync",
-               "group_id": group_id, "func_switch": functions}
+               "group_id": group_id, "func_switch": functions,
+               "phrase_version": int(group.get("hotword_version", 0))}
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
             client.settimeout(10)
