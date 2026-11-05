@@ -12,13 +12,9 @@ namespace ibus_settings::lang {
 inline constexpr const char *kAppName = "WeTypeX 设置（IBus）";
 inline constexpr const char *kBrandName = "WeTypeX";
 inline constexpr const char *kDeveloperName = "WeTypeX contributors";
-inline constexpr const char *kAboutComments =
-    "\nWeTypeX IBus 输入法设置\n"
-    "原版核心及相关商标归其权利人所有";
-inline constexpr const char *kWebsite =
-    "https://github.com/chencaidy/ibus-wetypex";
-inline constexpr const char *kIssues =
-    "https://github.com/chencaidy/ibus-wetypex/issues";
+inline constexpr const char *kAboutComments = "\nWeTypeX IBus 输入法设置\n原版核心及相关商标归其权利人所有";
+inline constexpr const char *kWebsite = "https://github.com/chencaidy/ibus-wetypex";
+inline constexpr const char *kIssues = "https://github.com/chencaidy/ibus-wetypex/issues";
 
 // ---- 页面标题 ----
 inline constexpr const char *kPageInputTitle = "输入";
@@ -35,19 +31,16 @@ inline constexpr const char *kInputDoublePinyinSubtitle = "选择双拼方案";
 inline constexpr const char *kInputWubiTitle = "五笔输入";
 inline constexpr const char *kInputWubiSubtitle = "选择五笔方案";
 
-inline const std::vector<std::string> kDoublePinyinSchemes = {
-    "自然码", "搜狗", "微软", "小鹤", "拼音加加", "紫光", "智能 ABC"};
-inline const std::vector<std::string> kWubiSolutions = {"86 五笔", "98 五笔",
-                                                        "新世纪五笔"};
+inline const std::vector<std::string> kDoublePinyinSchemes = {"自然码",   "搜狗", "微软",    "小鹤",
+                                                              "拼音加加", "紫光", "智能 ABC"};
+inline const std::vector<std::string> kWubiSolutions = {"86 五笔", "98 五笔", "新世纪五笔"};
 
 // ---- 输入页：候选窗口 ----
 inline constexpr const char *kGroupCandidates = "候选窗口";
 inline constexpr const char *kPageSizeTitle = "每页候选数";
-inline constexpr const char *kPageSizeSubtitle =
-    "IBus 候选窗口每页显示的候选数量";
+inline constexpr const char *kPageSizeSubtitle = "IBus 候选窗口每页显示的候选数量";
 inline constexpr const char *kVerticalCandidatesTitle = "竖排候选";
-inline constexpr const char *kVerticalCandidatesSubtitle =
-    "使用垂直排列的候选窗口";
+inline constexpr const char *kVerticalCandidatesSubtitle = "使用垂直排列的候选窗口";
 
 // ---- 输入页：输入行为 ----
 inline constexpr const char *kGroupBehavior = "输入行为";
@@ -59,13 +52,11 @@ inline constexpr const char *kSmartInputSubtitle = "启用原版智能纠错和�
 inline constexpr const char *kEmojiRecommendTitle = "表情和颜文字推荐";
 inline constexpr const char *kEmojiRecommendSubtitle = "在候选中推荐表情";
 inline constexpr const char *kChinesePunctuationTitle = "中文标点";
-inline constexpr const char *kChinesePunctuationSubtitle =
-    "输入中文时使用中文标点符号";
+inline constexpr const char *kChinesePunctuationSubtitle = "输入中文时使用中文标点符号";
 inline constexpr const char *kSlashPunctuationTitle = "将「/?」替换为 、";
 inline constexpr const char *kSlashPunctuationSubtitle = "输入斜杠时输出顿号";
 inline constexpr const char *kStandaloneTitle = "单机模式";
-inline constexpr const char *kStandaloneSubtitle =
-    "云输入/跨设备同步等功能将不可用";
+inline constexpr const char *kStandaloneSubtitle = "云输入/跨设备同步等功能将不可用";
 
 // ---- 输入页：高级选项 ----
 inline constexpr const char *kGroupAdvanced = "高级选项";
@@ -123,24 +114,19 @@ inline constexpr const char *kPhraseEmptySubtitle = "点击右上角添加";
 // ---- 跨设备页 ----
 inline constexpr const char *kDevicesGroupTitle = "跨设备";
 inline constexpr const char *kStandaloneDeviceTitle = "单机模式";
-inline constexpr const char *kStandaloneDeviceSubtitle =
-    "单机模式下跨设备功能不可用";
-inline constexpr const char *kDevicesNotPairedDescription =
-    "尚未关联设备，关联后可在电脑与手机之间同步剪贴板和常用语";
+inline constexpr const char *kStandaloneDeviceSubtitle = "单机模式下跨设备功能不可用";
+inline constexpr const char *kDevicesNotPairedDescription = "尚未关联设备，关联后可在电脑与手机之间同步剪贴板和常用语";
 inline constexpr const char *kPairDeviceTitle = "关联设备";
-inline constexpr const char *kPairDeviceSubtitle =
-    "使用另一台设备上的匹配码完成关联";
+inline constexpr const char *kPairDeviceSubtitle = "使用另一台设备上的匹配码完成关联";
 inline constexpr const char *kPairActionLabel = "获取匹配码";
 
 inline constexpr const char *kGroupSyncFeatures = "同步功能";
 inline constexpr const char *kSyncClipboardTitle = "跨设备复制粘贴";
-inline constexpr const char *kSyncClipboardSubtitle =
-    "在电脑复制的文字和图片可在手机粘贴";
+inline constexpr const char *kSyncClipboardSubtitle = "在电脑复制的文字和图片可在手机粘贴";
 inline constexpr const char *kSyncPhraseTitle = "常用语同步";
 inline constexpr const char *kSyncPhraseSubtitle = "在关联设备之间同步常用语";
 inline constexpr const char *kSyncDictionaryTitle = "个人词库同步";
-inline constexpr const char *kSyncDictionarySubtitle =
-    "在关联设备之间同步个人词库";
+inline constexpr const char *kSyncDictionarySubtitle = "在关联设备之间同步个人词库";
 inline constexpr const char *kSyncNowTitle = "立即请求同步";
 inline constexpr const char *kSyncNowSubtitle = "请求关联设备同步最新状态";
 inline constexpr const char *kSyncNowActionLabel = "刷新";
@@ -157,8 +143,7 @@ inline constexpr const char *kLocalDeviceBadge = "（本机）";
 inline constexpr const char *kLocalDeviceFallbackName = "LINUX";
 inline constexpr const char *kGroupDeviceManagement = "设备管理";
 inline constexpr const char *kAssociateDeviceTitle = "关联新设备";
-inline constexpr const char *kAssociateDeviceSubtitle =
-    "关联 iOS/Android 版本以使用跨设备同步";
+inline constexpr const char *kAssociateDeviceSubtitle = "关联 iOS/Android 版本以使用跨设备同步";
 inline constexpr const char *kDeviceSubtitleSeparator = " · ";
 
 inline constexpr const char *kPlatformAndroid = "Android";
@@ -171,13 +156,11 @@ inline constexpr const char *kPlatformUnknown = "未知";
 inline constexpr const char *kPairingWindowTitle = "关联设备";
 inline constexpr const char *kPairingCodeTitle = "本机匹配码";
 inline constexpr const char *kPairingCodeLoading = "正在获取匹配码";
-inline constexpr const char *kPairingCodeMessage =
-    "请在另一台设备中进入：\n"
-    "「手机端微信输入法设置 → 跨设备粘贴同步 → 关联设备」\n"
-    "输入上方匹配码关联";
+inline constexpr const char *kPairingCodeMessage = "请在另一台设备中进入：\n"
+                                                   "「手机端微信输入法设置 → 跨设备粘贴同步 → 关联设备」\n"
+                                                   "输入上方匹配码关联";
 inline constexpr const char *kPairingCodeValid = "匹配码 5 分钟内有效";
-inline constexpr const char *kPairingCodeUnavailable =
-    "暂时无法获取匹配码，请稍后重试";
+inline constexpr const char *kPairingCodeUnavailable = "暂时无法获取匹配码，请稍后重试";
 inline constexpr const char *kPairingCodeInvalid = "服务返回了无效匹配码";
 inline constexpr const char *kPairingCodeExpired = "匹配码已失效，请关闭后重试";
 inline constexpr const char *kPairingConfirmOnOther = "请在另一台设备确认关联";

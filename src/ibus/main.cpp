@@ -1,6 +1,13 @@
 #include "../common/json.hpp"
-#include <ibus.h>
+
+#include <fcntl.h>
 #include <glib-unix.h>
+#include <ibus.h>
+#include <spawn.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -11,11 +18,6 @@
 #include <fstream>
 #include <string>
 #include <string_view>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <spawn.h>
 #include <vector>
 
 extern char **environ;
@@ -55,22 +57,13 @@ struct PunctuationEntry {
 };
 
 static constexpr std::array<PunctuationEntry, 32> kPunctuation = {{
-    {'!', "！", "!", 0},       {'"', "“”", "\"\"", 2},
-    {'#', "#", "#", 0},        {'$', "¥", "$", 0},
-    {'%', "%", "%", 0},        {'&', "&", "&", 0},
-    {'\'', "‘’", "''", 2},     {'(', "（）", "()", 1},
-    {')', "）", ")", 0},       {'*', "*", "*", 0},
-    {'+', "+", "+", 0},        {',', "，", ",", 0},
-    {'-', "-", "-", 0},        {'.', "。", ".", 0},
-    {'/', "/", "/", 0},        {':', "：", ":", 0},
-    {';', "；", ";", 0},       {'<', "《》", "<>", 1},
-    {'=', "=", "=", 0},        {'>', "》", ">", 0},
-    {'?', "？", "?", 0},       {'@', "@", "@", 0},
-    {'[', "【】", "[]", 1},    {'\\', "、", "\\", 0},
-    {']', "】", "]", 0},       {'^', "……", "^", 0},
-    {'_', "——", "_", 0},       {'`', "·", "`", 0},
-    {'{', "「」", "{}", 1},    {'|', "|", "|", 0},
-    {'}', "」", "}", 0},       {'~', "～", "~", 0},
+    {'!', "！", "!", 0}, {'"', "“”", "\"\"", 2}, {'#', "#", "#", 0},     {'$', "¥", "$", 0},     {'%', "%", "%", 0},
+    {'&', "&", "&", 0},  {'\'', "‘’", "''", 2},  {'(', "（）", "()", 1}, {')', "）", ")", 0},    {'*', "*", "*", 0},
+    {'+', "+", "+", 0},  {',', "，", ",", 0},    {'-', "-", "-", 0},     {'.', "。", ".", 0},    {'/', "/", "/", 0},
+    {':', "：", ":", 0}, {';', "；", ";", 0},    {'<', "《》", "<>", 1}, {'=', "=", "=", 0},     {'>', "》", ">", 0},
+    {'?', "？", "?", 0}, {'@', "@", "@", 0},     {'[', "【】", "[]", 1}, {'\\', "、", "\\", 0},  {']', "】", "]", 0},
+    {'^', "……", "^", 0}, {'_', "——", "_", 0},    {'`', "·", "`", 0},     {'{', "「」", "{}", 1}, {'|', "|", "|", 0},
+    {'}', "」", "}", 0}, {'~', "～", "~", 0},
 }};
 
 struct EngineState;
@@ -152,23 +145,19 @@ bool jsonBool(json_object *object, const char *key, bool fallback) {
   auto *value = wire::get(object, key);
   if (!value)
     return fallback;
-  if (json_object_is_type(value, json_type_boolean) ||
-      json_object_is_type(value, json_type_int))
+  if (json_object_is_type(value, json_type_boolean) || json_object_is_type(value, json_type_int))
     return json_object_get_boolean(value);
   return fallback;
 }
 
 int jsonInt(json_object *object, const char *key, int fallback) {
   auto *value = wire::get(object, key);
-  return value && json_object_is_type(value, json_type_int)
-             ? json_object_get_int(value)
-             : fallback;
+  return value && json_object_is_type(value, json_type_int) ? json_object_get_int(value) : fallback;
 }
 
 Settings readSettings() {
   Settings settings;
-  const std::filesystem::path path =
-      std::filesystem::path(g_get_user_config_dir()) / "fcitx5/wetypex.json";
+  const std::filesystem::path path = std::filesystem::path(g_get_user_config_dir()) / "fcitx5/wetypex.json";
   std::ifstream file(path);
   if (!file)
     return settings;
@@ -184,16 +173,13 @@ Settings readSettings() {
   if (mode == "pinyin" || mode == "double_pinyin" || mode == "wubi")
     settings.inputMode = mode;
   settings.defaultLanguage = wire::str(json.get(), "default_language", "chinese");
-  settings.doublePinyinScheme =
-      std::clamp(jsonInt(json.get(), "double_pinyin_scheme", 0), 0, 6);
+  settings.doublePinyinScheme = std::clamp(jsonInt(json.get(), "double_pinyin_scheme", 0), 0, 6);
   settings.wubiSolution = std::clamp(jsonInt(json.get(), "wubi_solution", 0), 0, 2);
   settings.pageSize = std::clamp(jsonInt(json.get(), "page_size", 5), 3, 9);
   settings.shiftSwitch = jsonBool(json.get(), "shift_switch", true);
   settings.standalone = jsonBool(json.get(), "standalone", false);
-  settings.chinesePunctuation =
-      jsonBool(json.get(), "chinese_punctuation", true);
-  settings.slashPunctuation =
-      jsonBool(json.get(), "slash_punctuation", true);
+  settings.chinesePunctuation = jsonBool(json.get(), "chinese_punctuation", true);
+  settings.slashPunctuation = jsonBool(json.get(), "slash_punctuation", true);
   settings.vertical = jsonBool(json.get(), "vertical", false);
   settings.smartInput = jsonBool(json.get(), "smart_input", true);
   settings.emojiRecommend = jsonBool(json.get(), "emoji_recommend", true);
@@ -205,14 +191,12 @@ Settings readSettings() {
   settings.wubiPinyin = jsonBool(json.get(), "wubi_pinyin", false);
   settings.wubiUniqueCommit = jsonBool(json.get(), "wubi_unique_commit", false);
   settings.wubiNextCommit = jsonBool(json.get(), "wubi_next_commit", false);
-  settings.wubiWildcardComment =
-      jsonBool(json.get(), "wubi_wildcard_comment", false);
+  settings.wubiWildcardComment = jsonBool(json.get(), "wubi_wildcard_comment", false);
   constexpr std::array<const char *, 19> fuzzyKeys = {
-      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",       "fuzzy_gk",
-      "fuzzy_an_ang",   "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",
-      "fuzzy_s_sh",     "fuzzy_z_zh",     "fuzzy_hui_fei",  "fuzzy_en_eng",
-      "fuzzy_in_ing",   "fuzzy_on_ong",   "fuzzy_huang_wang", "fuzzy_un_ong",
-      "fuzzy_un_iong",  "fuzzy_an_ai",    "fuzzy_eng_ong"};
+      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",     "fuzzy_gk",     "fuzzy_an_ang",
+      "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",   "fuzzy_s_sh",   "fuzzy_z_zh",
+      "fuzzy_hui_fei",  "fuzzy_en_eng",   "fuzzy_in_ing", "fuzzy_on_ong", "fuzzy_huang_wang",
+      "fuzzy_un_ong",   "fuzzy_un_iong",  "fuzzy_an_ai",  "fuzzy_eng_ong"};
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     settings.fuzzy[i] = jsonBool(json.get(), fuzzyKeys[i], false);
   return settings;
@@ -220,18 +204,15 @@ Settings readSettings() {
 
 void clearUi(EngineState *state) {
   auto *engine = IBUS_ENGINE(state->owner);
-  ibus_engine_update_preedit_text(engine, ibus_text_new_from_string(""), 0,
-                                  FALSE);
-  ibus_engine_update_lookup_table(
-      engine, ibus_lookup_table_new(5, 0, FALSE, FALSE), FALSE);
+  ibus_engine_update_preedit_text(engine, ibus_text_new_from_string(""), 0, FALSE);
+  ibus_engine_update_lookup_table(engine, ibus_lookup_table_new(5, 0, FALSE, FALSE), FALSE);
   state->renderedPreedit.clear();
   state->renderedCursor = 0;
   state->renderedPreeditVisible = false;
   state->renderedPreeditInitialized = true;
 }
 
-gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
-                    guint modifiers);
+gboolean processKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers);
 
 size_t previousUtf8(const std::string &text, size_t position) {
   position = std::min(position, text.size());
@@ -252,65 +233,44 @@ size_t nextUtf8(const std::string &text, size_t position) {
 
 guint utf8Cursor(const std::string &text, size_t bytePosition) {
   bytePosition = std::min(bytePosition, text.size());
-  return static_cast<guint>(
-      g_utf8_pointer_to_offset(text.c_str(), text.c_str() + bytePosition));
+  return static_cast<guint>(g_utf8_pointer_to_offset(text.c_str(), text.c_str() + bytePosition));
 }
 
 void updateUi(EngineState *state) {
   auto *engine = IBUS_ENGINE(state->owner);
-  const std::string &shown =
-      state->displayPreedit.empty() ? state->preedit : state->displayPreedit;
-  const size_t byteCursor =
-      state->displayPreedit.empty() ? state->cursor : state->displayCursor;
+  const std::string &shown = state->displayPreedit.empty() ? state->preedit : state->displayPreedit;
+  const size_t byteCursor = state->displayPreedit.empty() ? state->cursor : state->displayCursor;
   const bool preeditVisible = !shown.empty();
   const guint cursor = utf8Cursor(shown, byteCursor);
-  if (!state->renderedPreeditInitialized ||
-      shown != state->renderedPreedit ||
-      cursor != state->renderedCursor ||
+  if (!state->renderedPreeditInitialized || shown != state->renderedPreedit || cursor != state->renderedCursor ||
       preeditVisible != state->renderedPreeditVisible) {
-    ibus_engine_update_preedit_text(
-        engine, ibus_text_new_from_string(shown.c_str()), cursor,
-        preeditVisible);
+    ibus_engine_update_preedit_text(engine, ibus_text_new_from_string(shown.c_str()), cursor, preeditVisible);
     state->renderedPreedit = shown;
     state->renderedCursor = cursor;
     state->renderedPreeditVisible = preeditVisible;
     state->renderedPreeditInitialized = true;
   }
 
-  const bool pending =
-      !state->backendFailed &&
-      (state->inputSequence > state->applied || state->selectionPending);
-  const bool showCandidates =
-      !state->preedit.empty() && !pending && !state->candidates.empty();
+  const bool pending = !state->backendFailed && (state->inputSequence > state->applied || state->selectionPending);
+  const bool showCandidates = !state->preedit.empty() && !pending && !state->candidates.empty();
   if (pending && !state->preedit.empty())
     return;
   auto *table = ibus_lookup_table_new(
       static_cast<guint>(state->settings.pageSize),
-      static_cast<guint>(std::max(0, state->candidateCursor %
-                                         state->settings.pageSize)),
-      TRUE, FALSE);
-  ibus_lookup_table_set_orientation(
-      table, state->settings.vertical ? IBUS_ORIENTATION_VERTICAL
-                                     : IBUS_ORIENTATION_HORIZONTAL);
+      static_cast<guint>(std::max(0, state->candidateCursor % state->settings.pageSize)), TRUE, FALSE);
+  ibus_lookup_table_set_orientation(table,
+                                    state->settings.vertical ? IBUS_ORIENTATION_VERTICAL : IBUS_ORIENTATION_HORIZONTAL);
   for (size_t i = 0; i < state->candidates.size(); ++i) {
     std::string candidate =
-        i < state->cloud.size() && state->cloud[i]
-            ? "☁ " + state->candidates[i]
-            : state->candidates[i];
-    ibus_lookup_table_append_candidate(
-        table, ibus_text_new_from_string(candidate.c_str()));
-    const std::string label =
-        std::to_string(i % static_cast<size_t>(state->settings.pageSize) + 1);
-    ibus_lookup_table_append_label(
-        table, ibus_text_new_from_string(label.c_str()));
+        i < state->cloud.size() && state->cloud[i] ? "☁ " + state->candidates[i] : state->candidates[i];
+    ibus_lookup_table_append_candidate(table, ibus_text_new_from_string(candidate.c_str()));
+    const std::string label = std::to_string(i % static_cast<size_t>(state->settings.pageSize) + 1);
+    ibus_lookup_table_append_label(table, ibus_text_new_from_string(label.c_str()));
   }
   if (!state->candidates.empty()) {
-    state->candidateCursor = std::clamp(
-        state->candidateCursor, 0, static_cast<int>(state->candidates.size()) - 1);
-    ibus_lookup_table_set_cursor_pos(table,
-                                     static_cast<guint>(state->candidateCursor));
-    state->candidatePage =
-        state->candidateCursor / state->settings.pageSize;
+    state->candidateCursor = std::clamp(state->candidateCursor, 0, static_cast<int>(state->candidates.size()) - 1);
+    ibus_lookup_table_set_cursor_pos(table, static_cast<guint>(state->candidateCursor));
+    state->candidatePage = state->candidateCursor / state->settings.pageSize;
   } else {
     state->candidateCursor = 0;
     state->candidatePage = 0;
@@ -376,8 +336,7 @@ gboolean backendReadable(gint fd, GIOCondition condition, gpointer data) {
 gboolean backendWritable(gint fd, GIOCondition condition, gpointer data) {
   auto *state = static_cast<EngineState *>(data);
   while (!state->outbound.empty()) {
-    const ssize_t count = ::send(fd, state->outbound.data(),
-                                 state->outbound.size(), MSG_NOSIGNAL);
+    const ssize_t count = ::send(fd, state->outbound.data(), state->outbound.size(), MSG_NOSIGNAL);
     if (count > 0) {
       state->outbound.erase(0, static_cast<size_t>(count));
       continue;
@@ -443,8 +402,7 @@ bool startBackend(EngineState *state) {
       close(toChild[0]);
       close(toChild[1]);
     }
-    g_warning("Unable to create the WeTypeX backend sockets: %s",
-              g_strerror(errno));
+    g_warning("Unable to create the WeTypeX backend sockets: %s", g_strerror(errno));
     return false;
   }
   posix_spawn_file_actions_t actions;
@@ -458,8 +416,7 @@ bool startBackend(EngineState *state) {
   const char *override = g_getenv("WETYPE_BACKEND_LAUNCHER");
   std::string launcher = override && *override ? override : WETYPE_LAUNCHER;
   char *argv[] = {launcher.data(), nullptr};
-  const int result = posix_spawn(&state->backendPid, launcher.c_str(), &actions,
-                                 nullptr, argv, environ);
+  const int result = posix_spawn(&state->backendPid, launcher.c_str(), &actions, nullptr, argv, environ);
   posix_spawn_file_actions_destroy(&actions);
   close(toChild[0]);
   close(fromChild[1]);
@@ -474,10 +431,8 @@ bool startBackend(EngineState *state) {
   state->readFd = fromChild[0];
   fcntl(state->writeFd, F_SETFL, fcntl(state->writeFd, F_GETFL) | O_NONBLOCK);
   fcntl(state->readFd, F_SETFL, fcntl(state->readFd, F_GETFL) | O_NONBLOCK);
-  state->readSource = g_unix_fd_add(
-      state->readFd,
-      static_cast<GIOCondition>(G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL),
-      backendReadable, state);
+  state->readSource = g_unix_fd_add(state->readFd, static_cast<GIOCondition>(G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL),
+                                    backendReadable, state);
   state->backendFailed = false;
   g_debug("WeTypeX backend running.");
   return true;
@@ -498,21 +453,16 @@ void queueLine(EngineState *state, const std::string &line) {
   state->outbound += line;
   state->outbound += '\n';
   if (!state->writeSource && state->writeFd >= 0)
-    state->writeSource =
-        g_unix_fd_add(state->writeFd,
-                      static_cast<GIOCondition>(G_IO_OUT | G_IO_HUP | G_IO_ERR),
-                      backendWritable, state);
+    state->writeSource = g_unix_fd_add(state->writeFd, static_cast<GIOCondition>(G_IO_OUT | G_IO_HUP | G_IO_ERR),
+                                       backendWritable, state);
 }
 
 void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "candidate_updates", true);
-  wire::put(request, "keyboard",
-            int64_t(settings.inputMode == "wubi" ? 5 : 0));
+  wire::put(request, "keyboard", int64_t(settings.inputMode == "wubi" ? 5 : 0));
   constexpr std::array<int, 7> doubleSchemes = {5, 1, 2, 3, 4, 6, 7};
   wire::put(request, "double_scheme",
-            int64_t(settings.inputMode == "double_pinyin"
-                        ? doubleSchemes[settings.doublePinyinScheme]
-                        : 0));
+            int64_t(settings.inputMode == "double_pinyin" ? doubleSchemes[settings.doublePinyinScheme] : 0));
   wire::put(request, "wubi_solution", int64_t(settings.wubiSolution));
   wire::put(request, "wubi_pinyin", settings.wubiPinyin);
   wire::put(request, "wubi_unique_commit", settings.wubiUniqueCommit);
@@ -527,19 +477,16 @@ void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "symbol_emoji", settings.symbolEmoji);
   wire::put(request, "v_mode", false);
   constexpr std::array<const char *, 19> fuzzyKeys = {
-      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",       "fuzzy_gk",
-      "fuzzy_an_ang",   "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",
-      "fuzzy_s_sh",     "fuzzy_z_zh",     "fuzzy_hui_fei",  "fuzzy_en_eng",
-      "fuzzy_in_ing",   "fuzzy_on_ong",   "fuzzy_huang_wang", "fuzzy_un_ong",
-      "fuzzy_un_iong",  "fuzzy_an_ai",    "fuzzy_eng_ong"};
+      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",     "fuzzy_gk",     "fuzzy_an_ang",
+      "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",   "fuzzy_s_sh",   "fuzzy_z_zh",
+      "fuzzy_hui_fei",  "fuzzy_en_eng",   "fuzzy_in_ing", "fuzzy_on_ong", "fuzzy_huang_wang",
+      "fuzzy_un_ong",   "fuzzy_un_iong",  "fuzzy_an_ai",  "fuzzy_eng_ong"};
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     wire::put(request, fuzzyKeys[i], settings.fuzzy[i]);
 }
 
-bool sendRequest(EngineState *state, const char *operation,
-                 const std::string &key = "", int index = 0,
-                 int64_t revision = -1, int64_t cursor = -1,
-                 const std::string &mapped = "") {
+bool sendRequest(EngineState *state, const char *operation, const std::string &key = "", int index = 0,
+                 int64_t revision = -1, int64_t cursor = -1, const std::string &mapped = "") {
   if (!startBackend(state))
     return false;
   auto request = wire::object();
@@ -551,8 +498,7 @@ bool sendRequest(EngineState *state, const char *operation,
   wire::put(request.get(), "index", int64_t(index));
   wire::put(request.get(), "revision", revision);
   wire::put(request.get(), "cursor", cursor);
-  wire::put(request.get(), "chinese_punctuation",
-            int64_t(state->settings.chinesePunctuation));
+  wire::put(request.get(), "chinese_punctuation", int64_t(state->settings.chinesePunctuation));
   wire::put(request.get(), "mapped", mapped);
   putSettings(request.get(), state->settings);
   const std::string line = wire::dump(request.get());
@@ -560,10 +506,8 @@ bool sendRequest(EngineState *state, const char *operation,
     g_warning("Refusing oversized WeTypeX backend request");
     return false;
   }
-  if (std::string_view(operation) == "key" ||
-      std::string_view(operation) == "backspace" ||
-      std::string_view(operation) == "delete" ||
-      std::string_view(operation) == "move")
+  if (std::string_view(operation) == "key" || std::string_view(operation) == "backspace" ||
+      std::string_view(operation) == "delete" || std::string_view(operation) == "move")
     state->inputSequence = state->sequence;
   queueLine(state, line);
   return true;
@@ -571,14 +515,11 @@ bool sendRequest(EngineState *state, const char *operation,
 
 const PunctuationEntry *punctuationEntry(char ascii) {
   auto it = std::find_if(kPunctuation.begin(), kPunctuation.end(),
-                         [ascii](const auto &entry) {
-                           return entry.ascii == ascii;
-                         });
+                         [ascii](const auto &entry) { return entry.ascii == ascii; });
   return it == kPunctuation.end() ? nullptr : &*it;
 }
 
-std::string mappedPunctuation(const EngineState *state, char ascii,
-                              bool englishMode) {
+std::string mappedPunctuation(const EngineState *state, char ascii, bool englishMode) {
   const auto *entry = punctuationEntry(ascii);
   if (!entry)
     return std::string(1, ascii);
@@ -589,8 +530,7 @@ std::string mappedPunctuation(const EngineState *state, char ascii,
   return entry->normal;
 }
 
-bool splitPunctuationPair(const std::string &text, std::string &left,
-                          std::string &right) {
+bool splitPunctuationPair(const std::string &text, std::string &left, std::string &right) {
   if (g_utf8_strlen(text.c_str(), -1) != 2)
     return false;
   const char *middle = g_utf8_offset_to_pointer(text.c_str(), 1);
@@ -608,19 +548,14 @@ void processResponse(EngineState *state, const std::string &line) {
     state->backendFailed = false;
     return;
   }
-  if (static_cast<uint64_t>(wire::number(json.get(), "session")) !=
-      state->session)
+  if (static_cast<uint64_t>(wire::number(json.get(), "session")) != state->session)
     return;
-  const auto sequence =
-      static_cast<uint64_t>(wire::number(json.get(), "seq"));
+  const auto sequence = static_cast<uint64_t>(wire::number(json.get(), "seq"));
   const auto epoch = static_cast<uint64_t>(wire::number(json.get(), "epoch"));
-  const auto updateId =
-      static_cast<uint64_t>(wire::number(json.get(), "update_id"));
+  const auto updateId = static_cast<uint64_t>(wire::number(json.get(), "update_id"));
   const bool pushed = wire::str(json.get(), "event") == "update";
-  if (epoch != state->epoch || sequence < state->applied ||
-      sequence > state->sequence ||
-      (sequence == state->applied &&
-       (!pushed || updateId <= state->appliedUpdate)))
+  if (epoch != state->epoch || sequence < state->applied || sequence > state->sequence ||
+      (sequence == state->applied && (!pushed || updateId <= state->appliedUpdate)))
     return;
   state->applied = sequence;
   state->appliedUpdate = updateId;
@@ -631,9 +566,7 @@ void processResponse(EngineState *state, const std::string &line) {
     for (size_t i = 0; i < json_object_array_length(commits); ++i) {
       auto *value = json_object_array_get_idx(commits, i);
       if (json_object_is_type(value, json_type_string))
-        ibus_engine_commit_text(
-            IBUS_ENGINE(state->owner),
-            ibus_text_new_from_string(json_object_get_string(value)));
+        ibus_engine_commit_text(IBUS_ENGINE(state->owner), ibus_text_new_from_string(json_object_get_string(value)));
     }
   }
   if (sequence != state->sequence)
@@ -642,16 +575,13 @@ void processResponse(EngineState *state, const std::string &line) {
   state->backendFailed = false;
   state->preedit = wire::str(json.get(), "preedit");
   state->cursor = std::min<size_t>(
-      std::max<int64_t>(0, wire::number(json.get(), "cursor",
-                                        static_cast<int64_t>(state->preedit.size()))),
+      std::max<int64_t>(0, wire::number(json.get(), "cursor", static_cast<int64_t>(state->preedit.size()))),
       state->preedit.size());
-  state->editableBegin = std::min<size_t>(
-      std::max<int64_t>(0, wire::number(json.get(), "editable_begin")),
-      state->preedit.size());
+  state->editableBegin =
+      std::min<size_t>(std::max<int64_t>(0, wire::number(json.get(), "editable_begin")), state->preedit.size());
   state->displayPreedit = wire::str(json.get(), "display_preedit");
-  state->displayCursor = std::min<size_t>(
-      std::max<int64_t>(0, wire::number(json.get(), "display_cursor")),
-      state->displayPreedit.size());
+  state->displayCursor =
+      std::min<size_t>(std::max<int64_t>(0, wire::number(json.get(), "display_cursor")), state->displayPreedit.size());
   state->revision = static_cast<uint64_t>(wire::number(json.get(), "revision"));
   state->candidates.clear();
   state->cloud.clear();
@@ -664,31 +594,24 @@ void processResponse(EngineState *state, const std::string &line) {
       if (!json_object_is_type(candidate, json_type_string))
         continue;
       state->candidates.emplace_back(json_object_get_string(candidate));
-      auto *cloudFlag =
-          cloud && json_object_is_type(cloud, json_type_array) &&
-                  i < json_object_array_length(cloud)
-              ? json_object_array_get_idx(cloud, i)
-              : nullptr;
-      state->cloud.push_back(cloudFlag &&
-                             json_object_get_boolean(cloudFlag));
+      auto *cloudFlag = cloud && json_object_is_type(cloud, json_type_array) && i < json_object_array_length(cloud)
+                            ? json_object_array_get_idx(cloud, i)
+                            : nullptr;
+      state->cloud.push_back(cloudFlag && json_object_get_boolean(cloudFlag));
     }
   }
   if (state->candidates.empty()) {
     state->candidatePage = 0;
     state->candidateCursor = 0;
   } else {
-    state->candidateCursor = std::clamp(
-        state->candidateCursor, 0,
-        static_cast<int>(state->candidates.size()) - 1);
-    state->candidatePage =
-        state->candidateCursor / state->settings.pageSize;
+    state->candidateCursor = std::clamp(state->candidateCursor, 0, static_cast<int>(state->candidates.size()) - 1);
+    state->candidatePage = state->candidateCursor / state->settings.pageSize;
   }
   updateUi(state);
   auto deferred = std::move(state->deferredKeys);
   state->deferredKeys.clear();
   for (const auto &key : deferred)
-    processKey(IBUS_ENGINE(state->owner), key.keyval, key.keycode,
-               key.modifiers);
+    processKey(IBUS_ENGINE(state->owner), key.keyval, key.keycode, key.modifiers);
 }
 
 void resetComposition(EngineState *state, bool sendReset) {
@@ -718,21 +641,15 @@ void updateModeProperty(EngineState *state) {
     return;
 
   if (state->backendFailed) {
-    ibus_property_set_symbol(state->modeProperty,
-                             ibus_text_new_from_string("✕"));
-    ibus_property_set_label(state->modeProperty,
-                            ibus_text_new_from_string("核心不可用"));
+    ibus_property_set_symbol(state->modeProperty, ibus_text_new_from_string("✕"));
+    ibus_property_set_label(state->modeProperty, ibus_text_new_from_string("核心不可用"));
   } else {
     if (state->english) {
-      ibus_property_set_symbol(state->modeProperty,
-                               ibus_text_new_from_string("英"));
-      ibus_property_set_label(state->modeProperty,
-                              ibus_text_new_from_string("英文"));
+      ibus_property_set_symbol(state->modeProperty, ibus_text_new_from_string("英"));
+      ibus_property_set_label(state->modeProperty, ibus_text_new_from_string("英文"));
     } else {
-      ibus_property_set_symbol(state->modeProperty,
-                               ibus_text_new_from_string("中"));
-      ibus_property_set_label(state->modeProperty,
-                              ibus_text_new_from_string("中文"));
+      ibus_property_set_symbol(state->modeProperty, ibus_text_new_from_string("中"));
+      ibus_property_set_label(state->modeProperty, ibus_text_new_from_string("中文"));
     }
   }
 
@@ -746,19 +663,16 @@ void registerProperties(EngineState *state) {
     // unrefs *floating* lists, so this list survives every re-publish.
     g_object_ref_sink(state->properties);
 
-    auto *mode = ibus_property_new(
-        "InputMode", PROP_TYPE_NORMAL, ibus_text_new_from_string("中文"),
-        "input-keyboard", ibus_text_new_from_string("当前输入模式"), TRUE, TRUE,
-        PROP_STATE_UNCHECKED, nullptr);
+    auto *mode =
+        ibus_property_new("InputMode", PROP_TYPE_NORMAL, ibus_text_new_from_string("中文"), "input-keyboard",
+                          ibus_text_new_from_string("当前输入模式"), TRUE, TRUE, PROP_STATE_UNCHECKED, nullptr);
     // The list takes its own reference, so keep a borrowed pointer only.
     ibus_prop_list_append(state->properties, mode);
     state->modeProperty = mode;
 
-    auto *restart = ibus_property_new(
-        "RestartBackend", PROP_TYPE_NORMAL,
-        ibus_text_new_from_string("重启核心"), "system-restart",
-        ibus_text_new_from_string("重启 WeTypeX 核心进程"), TRUE, TRUE,
-        PROP_STATE_UNCHECKED, nullptr);
+    auto *restart = ibus_property_new("RestartBackend", PROP_TYPE_NORMAL, ibus_text_new_from_string("重启核心"),
+                                      "system-restart", ibus_text_new_from_string("重启 WeTypeX 核心进程"), TRUE, TRUE,
+                                      PROP_STATE_UNCHECKED, nullptr);
     ibus_prop_list_append(state->properties, restart);
     state->restartProperty = mode;
   }
@@ -773,9 +687,7 @@ void setEnglishMode(EngineState *state, bool english) {
     return;
   }
   if (!state->preedit.empty()) {
-    ibus_engine_commit_text(
-        IBUS_ENGINE(state->owner),
-        ibus_text_new_from_string(state->preedit.c_str()));
+    ibus_engine_commit_text(IBUS_ENGINE(state->owner), ibus_text_new_from_string(state->preedit.c_str()));
     resetComposition(state, true);
   }
   state->english = english;
@@ -787,8 +699,7 @@ void setEnglishMode(EngineState *state, bool english) {
 }
 
 void activate(EngineState *state) {
-  const bool active = state->enabled && state->focused &&
-                      state->contentPurpose != IBUS_INPUT_PURPOSE_PASSWORD &&
+  const bool active = state->enabled && state->focused && state->contentPurpose != IBUS_INPUT_PURPOSE_PASSWORD &&
                       state->contentPurpose != IBUS_INPUT_PURPOSE_PIN;
   if (active == state->active)
     return;
@@ -808,21 +719,15 @@ void activate(EngineState *state) {
       std::string launcher = override && *override ? override : WETYPE_SYNCD;
       posix_spawn_file_actions_t actions;
       posix_spawn_file_actions_init(&actions);
-      posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null",
-                                       O_RDONLY, 0);
-      posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/dev/null",
-                                       O_WRONLY, 0);
-      posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null",
-                                       O_WRONLY, 0);
+      posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+      posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
+      posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
       char *argv[] = {launcher.data(), nullptr};
-      const int result =
-          posix_spawn(&syncPid, launcher.c_str(), &actions, nullptr, argv,
-                      environ);
+      const int result = posix_spawn(&syncPid, launcher.c_str(), &actions, nullptr, argv, environ);
       posix_spawn_file_actions_destroy(&actions);
       if (result != 0) {
         syncPid = -1;
-        g_warning("Unable to start remote clipboard synchronization: %s",
-                  g_strerror(result));
+        g_warning("Unable to start remote clipboard synchronization: %s", g_strerror(result));
       } else {
         syncWatch = g_child_watch_add(
             syncPid,
@@ -844,8 +749,7 @@ void activate(EngineState *state) {
 }
 
 bool isCommandModifier(guint modifiers) {
-  constexpr guint mask = IBUS_CONTROL_MASK | IBUS_MOD1_MASK |
-                         IBUS_MOD3_MASK | IBUS_MOD4_MASK | IBUS_MOD5_MASK |
+  constexpr guint mask = IBUS_CONTROL_MASK | IBUS_MOD1_MASK | IBUS_MOD3_MASK | IBUS_MOD4_MASK | IBUS_MOD5_MASK |
                          IBUS_SUPER_MASK | IBUS_HYPER_MASK | IBUS_META_MASK;
   return (modifiers & mask) != 0;
 }
@@ -866,8 +770,7 @@ bool processPunctuation(EngineState *state, char ascii, bool englishMode) {
     // closing side stays reachable. symbol_auto_pair therefore has no effect
     // in this frontend.
     if (entry->pairType == 2) {
-      bool &leftNext = ascii == '"' ? state->doubleQuoteLeft
-                                    : state->singleQuoteLeft;
+      bool &leftNext = ascii == '"' ? state->doubleQuoteLeft : state->singleQuoteLeft;
       mapped = leftNext ? left : right;
       leftNext = !leftNext;
     } else {
@@ -875,11 +778,9 @@ bool processPunctuation(EngineState *state, char ascii, bool englishMode) {
     }
   }
 
-  if (!sendRequest(state, "punctuation", std::string(1, ascii), 0, -1, -1,
-                   mapped)) {
+  if (!sendRequest(state, "punctuation", std::string(1, ascii), 0, -1, -1, mapped)) {
     if (!state->preedit.empty())
-      ibus_engine_commit_text(
-          engine, ibus_text_new_from_string(state->preedit.c_str()));
+      ibus_engine_commit_text(engine, ibus_text_new_from_string(state->preedit.c_str()));
     ibus_engine_commit_text(engine, ibus_text_new_from_string(mapped.c_str()));
   }
 
@@ -897,20 +798,15 @@ bool processPunctuation(EngineState *state, char ascii, bool englishMode) {
 void selectCandidate(EngineState *state, int index, bool pageRelative = false) {
   if (state->preedit.empty())
     return;
-  const bool hasCurrentCandidates =
-      state->inputSequence <= state->applied && !state->candidates.empty();
+  const bool hasCurrentCandidates = state->inputSequence <= state->applied && !state->candidates.empty();
   int globalIndex = index;
   if (index < 0)
     globalIndex = state->candidateCursor;
   else if (pageRelative)
     globalIndex += state->candidatePage * state->settings.pageSize;
-  if (hasCurrentCandidates &&
-      (globalIndex < 0 ||
-       globalIndex >= static_cast<int>(state->candidates.size())))
+  if (hasCurrentCandidates && (globalIndex < 0 || globalIndex >= static_cast<int>(state->candidates.size())))
     return;
-  const int64_t expected = hasCurrentCandidates
-                               ? static_cast<int64_t>(state->revision)
-                               : -1;
+  const int64_t expected = hasCurrentCandidates ? static_cast<int64_t>(state->revision) : -1;
   if (!sendRequest(state, "select", "", std::max(0, globalIndex), expected))
     return;
   state->selectionPending = true;
@@ -930,15 +826,13 @@ void updateCursor(EngineState *state, size_t position) {
   updateUi(state);
 }
 
-gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
-                    guint modifiers) {
+gboolean processKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
   const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
 
-  if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R ||
-      keyval == IBUS_KEY_Hyper_L || keyval == IBUS_KEY_Hyper_R ||
-      keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
+  if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R || keyval == IBUS_KEY_Hyper_L ||
+      keyval == IBUS_KEY_Hyper_R || keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
       isCommandModifier(cleanModifiers)) {
     // A modifier chord disarms the bare-Shift tap, like ascii_composer's
     // multi-modifier guard.
@@ -955,13 +849,12 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
     const uint8_t bit = keyval == IBUS_KEY_Shift_L ? 1 : 2;
     if (release) {
       state->pressedShifts &= static_cast<uint8_t>(~bit);
-      const bool switchMode =
-          state->pressedShifts == 0 && state->active && state->shiftCandidate &&
-          !state->shiftWasUsed && state->settings.shiftSwitch &&
-          // librime's ascii_composer only treats a Shift press-release pair
-          // within 500 ms as a tap; a held Shift means it was used as a
-          // modifier (Shift+click), so it must not toggle the language.
-          g_get_monotonic_time() - state->shiftPressedAt <= 500000;
+      const bool switchMode = state->pressedShifts == 0 && state->active && state->shiftCandidate &&
+                              !state->shiftWasUsed && state->settings.shiftSwitch &&
+                              // librime's ascii_composer only treats a Shift press-release pair
+                              // within 500 ms as a tap; a held Shift means it was used as a
+                              // modifier (Shift+click), so it must not toggle the language.
+                              g_get_monotonic_time() - state->shiftPressedAt <= 500000;
       state->shiftCandidate = false;
       state->shiftWasUsed = false;
       if (switchMode) {
@@ -1007,8 +900,7 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
 
     if (keyval == IBUS_KEY_Return || keyval == IBUS_KEY_KP_Enter) {
       if (!sendRequest(state, "raw")) {
-        ibus_engine_commit_text(
-            engine, ibus_text_new_from_string(state->preedit.c_str()));
+        ibus_engine_commit_text(engine, ibus_text_new_from_string(state->preedit.c_str()));
         resetComposition(state, false);
       }
       return TRUE;
@@ -1019,11 +911,8 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
       return TRUE;
     }
 
-    if ((keyval >= IBUS_KEY_1 && keyval <= IBUS_KEY_9) ||
-        (keyval >= IBUS_KEY_KP_1 && keyval <= IBUS_KEY_KP_9)) {
-      const guint digit = keyval >= IBUS_KEY_KP_1
-                              ? keyval - IBUS_KEY_KP_1
-                              : keyval - IBUS_KEY_1;
+    if ((keyval >= IBUS_KEY_1 && keyval <= IBUS_KEY_9) || (keyval >= IBUS_KEY_KP_1 && keyval <= IBUS_KEY_KP_9)) {
+      const guint digit = keyval >= IBUS_KEY_KP_1 ? keyval - IBUS_KEY_KP_1 : keyval - IBUS_KEY_1;
       if (digit < static_cast<guint>(state->settings.pageSize)) {
         selectCandidate(state, static_cast<int>(digit), true);
         return TRUE;
@@ -1075,16 +964,12 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
     }
 
     if (keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_Page_Down) {
-      const int pageCount = static_cast<int>(
-          (state->candidates.size() + state->settings.pageSize - 1) /
-          state->settings.pageSize);
+      const int pageCount =
+          static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
       if (pageCount > 1) {
         state->candidatePage =
-            std::clamp(state->candidatePage +
-                           (keyval == IBUS_KEY_Page_Down ? 1 : -1),
-                       0, pageCount - 1);
-        state->candidateCursor =
-            state->candidatePage * state->settings.pageSize;
+            std::clamp(state->candidatePage + (keyval == IBUS_KEY_Page_Down ? 1 : -1), 0, pageCount - 1);
+        state->candidateCursor = state->candidatePage * state->settings.pageSize;
         updateUi(state);
       }
       return TRUE;
@@ -1092,12 +977,9 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
 
     if (keyval == IBUS_KEY_Up || keyval == IBUS_KEY_Down) {
       if (!state->candidates.empty()) {
-        state->candidateCursor = std::clamp(
-            state->candidateCursor +
-                (keyval == IBUS_KEY_Down ? 1 : -1),
-            0, static_cast<int>(state->candidates.size()) - 1);
-        state->candidatePage =
-            state->candidateCursor / state->settings.pageSize;
+        state->candidateCursor = std::clamp(state->candidateCursor + (keyval == IBUS_KEY_Down ? 1 : -1), 0,
+                                            static_cast<int>(state->candidates.size()) - 1);
+        state->candidatePage = state->candidateCursor / state->settings.pageSize;
         updateUi(state);
       }
       return TRUE;
@@ -1107,10 +989,8 @@ gboolean processKey(IBusEngine *engine, guint keyval, guint keycode,
   gunichar unicode = ibus_keyval_to_unicode(keyval);
   if ((cleanModifiers & IBUS_SHIFT_MASK) && unicode >= 'a' && unicode <= 'z')
     unicode -= 'a' - 'A';
-  const bool letter = (unicode >= 'a' && unicode <= 'z') ||
-                      (unicode >= 'A' && unicode <= 'Z');
-  const bool separator = unicode == '\'' && !state->preedit.empty() &&
-                         state->settings.inputMode != "wubi";
+  const bool letter = (unicode >= 'a' && unicode <= 'z') || (unicode >= 'A' && unicode <= 'Z');
+  const bool separator = unicode == '\'' && !state->preedit.empty() && state->settings.inputMode != "wubi";
 
   if (state->english)
     return FALSE;
@@ -1187,9 +1067,8 @@ void onPageUp(IBusEngine *engine) {
 void onPageDown(IBusEngine *engine) {
   g_debug("onPageDown");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-  const int pages = static_cast<int>(
-      (state->candidates.size() + state->settings.pageSize - 1) /
-      state->settings.pageSize);
+  const int pages =
+      static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
   if (state->candidatePage + 1 < pages) {
     state->candidatePage++;
     state->candidateCursor = state->candidatePage * state->settings.pageSize;
@@ -1329,9 +1208,7 @@ int main(int argc, char **argv) {
 
   auto *loop = g_main_loop_new(nullptr, FALSE);
   g_signal_connect(bus, "disconnected",
-                   G_CALLBACK(+[](IBusBus *, gpointer data) {
-                     g_main_loop_quit(static_cast<GMainLoop *>(data));
-                   }),
+                   G_CALLBACK(+[](IBusBus *, gpointer data) { g_main_loop_quit(static_cast<GMainLoop *>(data)); }),
                    loop);
 
   // Loop

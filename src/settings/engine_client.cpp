@@ -45,8 +45,7 @@ std::string socket_request(const std::string &request, std::string *error) {
   g_socket_client_set_timeout(client, 2);
   GSocketAddress *address = g_unix_socket_address_new(path.c_str());
   GError *err = nullptr;
-  GSocketConnection *connection = g_socket_client_connect(
-      client, G_SOCKET_CONNECTABLE(address), nullptr, &err);
+  GSocketConnection *connection = g_socket_client_connect(client, G_SOCKET_CONNECTABLE(address), nullptr, &err);
   g_object_unref(address);
   if (!connection) {
     if (error)
@@ -60,19 +59,15 @@ std::string socket_request(const std::string &request, std::string *error) {
   std::string line = request;
   line.push_back('\n');
   gsize written = 0;
-  GOutputStream *output =
-      g_io_stream_get_output_stream(G_IO_STREAM(connection));
-  const bool sent = g_output_stream_write_all(output, line.data(), line.size(),
-                                              &written, nullptr, &err) &&
-                    written == line.size();
+  GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(connection));
+  const bool sent =
+      g_output_stream_write_all(output, line.data(), line.size(), &written, nullptr, &err) && written == line.size();
   std::string response;
   if (sent) {
     GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
     char buffer[4096];
-    while (response.find('\n') == std::string::npos &&
-           response.size() < kMaxResponse) {
-      const gssize count =
-          g_input_stream_read(input, buffer, sizeof(buffer), nullptr, &err);
+    while (response.find('\n') == std::string::npos && response.size() < kMaxResponse) {
+      const gssize count = g_input_stream_read(input, buffer, sizeof(buffer), nullptr, &err);
       if (count <= 0)
         break;
       response.append(buffer, static_cast<std::size_t>(count));
@@ -99,10 +94,8 @@ std::string socket_request(const std::string &request, std::string *error) {
   return response;
 }
 
-bool read_line_fd(int fd, std::string &pending, std::string &line,
-                  int timeout_ms) {
-  const gint64 deadline =
-      g_get_monotonic_time() + static_cast<gint64>(timeout_ms) * 1000;
+bool read_line_fd(int fd, std::string &pending, std::string &line, int timeout_ms) {
+  const gint64 deadline = g_get_monotonic_time() + static_cast<gint64>(timeout_ms) * 1000;
   for (;;) {
     const auto newline = pending.find('\n');
     if (newline != std::string::npos) {
@@ -136,12 +129,10 @@ std::string backend_request(const std::string &request, std::string *error) {
   const char *configured = g_getenv("WETYPE_BACKEND_LAUNCHER");
   const char *tool = configured && *configured ? configured : WETYPE_BACKEND;
   g_debug("%s", ("starting backend " + std::string(tool) + " for " + request_operation(request)).c_str());
-  GSubprocessLauncher *launcher =
-      g_subprocess_launcher_new(static_cast<GSubprocessFlags>(
-          G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE));
+  GSubprocessLauncher *launcher = g_subprocess_launcher_new(
+      static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_SILENCE));
   GError *err = nullptr;
-  GSubprocess *process =
-      g_subprocess_launcher_spawn(launcher, &err, tool, nullptr);
+  GSubprocess *process = g_subprocess_launcher_spawn(launcher, &err, tool, nullptr);
   g_object_unref(launcher);
   if (!process) {
     if (error)
@@ -191,8 +182,7 @@ std::string backend_request(const std::string &request, std::string *error) {
   request_line.push_back('\n');
   gsize written = 0;
   bool sent =
-      g_output_stream_write_all(stdin_stream, request_line.data(),
-                                request_line.size(), &written, nullptr, &err) &&
+      g_output_stream_write_all(stdin_stream, request_line.data(), request_line.size(), &written, nullptr, &err) &&
       written == request_line.size();
   std::string response;
   if (sent) {
@@ -216,8 +206,7 @@ std::string backend_request(const std::string &request, std::string *error) {
   g_clear_error(&err);
   const char quit[] = "{\"op\":\"quit\",\"session\":1,\"seq\":0}\n";
   gsize ignored = 0;
-  g_output_stream_write_all(stdin_stream, quit, sizeof(quit) - 1, &ignored,
-                            nullptr, nullptr);
+  g_output_stream_write_all(stdin_stream, quit, sizeof(quit) - 1, &ignored, nullptr, nullptr);
   g_subprocess_force_exit(process);
   g_subprocess_wait(process, nullptr, nullptr);
   g_object_unref(process);
@@ -275,8 +264,8 @@ void start_request(std::string request, EngineCallback done) {
   }).detach();
 }
 
-std::string make_request(const char *operation, const std::string &id,
-                         const std::string &key, const std::string &words) {
+std::string make_request(const char *operation, const std::string &id, const std::string &key,
+                         const std::string &words) {
   auto request = wire::object();
   wire::put(request.get(), "session", int64_t(1));
   wire::put(request.get(), "seq", int64_t(g_get_real_time() / 1000));
@@ -296,8 +285,7 @@ void request_hotword_list(EngineCallback done) {
   start_request(make_request("hotword_list", {}, {}, {}), std::move(done));
 }
 
-void request_hotword_set(const std::string &id, const std::string &key,
-                         const std::string &words, EngineCallback done) {
+void request_hotword_set(const std::string &id, const std::string &key, const std::string &words, EngineCallback done) {
   start_request(make_request("hotword_set", id, key, words), std::move(done));
 }
 

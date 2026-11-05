@@ -12,8 +12,7 @@ namespace {
 
 bool write_object(json_object *object) {
   const auto path = config_path();
-  const char *text = json_object_to_json_string_ext(
-      object, JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED);
+  const char *text = json_object_to_json_string_ext(object, JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED);
   if (!text)
     return false;
   std::string contents(text);
@@ -21,12 +20,9 @@ bool write_object(json_object *object) {
   GError *error = nullptr;
   const bool ok = g_file_set_contents_full(
       path.c_str(), contents.data(), static_cast<gssize>(contents.size()),
-      static_cast<GFileSetContentsFlags>(G_FILE_SET_CONTENTS_CONSISTENT |
-                                         G_FILE_SET_CONTENTS_DURABLE),
-      0644, &error);
+      static_cast<GFileSetContentsFlags>(G_FILE_SET_CONTENTS_CONSISTENT | G_FILE_SET_CONTENTS_DURABLE), 0644, &error);
   if (!ok) {
-    g_warning("Unable to write %s: %s", path.c_str(),
-              error ? error->message : "unknown error");
+    g_warning("Unable to write %s: %s", path.c_str(), error ? error->message : "unknown error");
     g_clear_error(&error);
   }
   return ok;
@@ -35,8 +31,7 @@ bool write_object(json_object *object) {
 } // namespace
 
 std::string config_path() {
-  gchar *directory =
-      g_build_filename(g_get_user_config_dir(), "fcitx5", nullptr);
+  gchar *directory = g_build_filename(g_get_user_config_dir(), "fcitx5", nullptr);
   g_mkdir_with_parents(directory, 0755);
   gchar *path = g_build_filename(directory, "wetypex.json", nullptr);
   std::string result(path);
@@ -49,8 +44,7 @@ wire::Json read_json_file(const std::string &path) {
   std::ifstream input(path);
   if (!input)
     return {};
-  std::string contents((std::istreambuf_iterator<char>(input)),
-                       std::istreambuf_iterator<char>());
+  std::string contents((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
   return wire::parse(contents);
 }
 
@@ -65,8 +59,7 @@ bool setting_bool(json_object *object, const char *key, bool fallback) {
   auto *value = wire::get(object, key);
   if (!value)
     return fallback;
-  if (json_object_is_type(value, json_type_boolean) ||
-      json_object_is_type(value, json_type_int))
+  if (json_object_is_type(value, json_type_boolean) || json_object_is_type(value, json_type_int))
     return json_object_get_boolean(value);
   return fallback;
 }
@@ -79,19 +72,16 @@ int setting_int(json_object *object, const char *key, int fallback) {
     return static_cast<int>(json_object_get_int64(value));
   if (json_object_is_type(value, json_type_double)) {
     const double number = json_object_get_double(value);
-    if (std::isfinite(number) && number >= std::numeric_limits<int>::min() &&
-        number <= std::numeric_limits<int>::max())
+    if (std::isfinite(number) && number >= std::numeric_limits<int>::min() && number <= std::numeric_limits<int>::max())
       return static_cast<int>(number);
   }
   return fallback;
 }
 
-std::string setting_string(json_object *object, const char *key,
-                           const std::string &fallback) {
+std::string setting_string(json_object *object, const char *key, const std::string &fallback) {
   auto *value = wire::get(object, key);
   return value && json_object_is_type(value, json_type_string)
-             ? std::string(json_object_get_string(value),
-                           json_object_get_string_len(value))
+             ? std::string(json_object_get_string(value), json_object_get_string_len(value))
              : fallback;
 }
 
@@ -109,9 +99,7 @@ bool write_setting_int(const char *key, int value) {
 
 bool write_setting_string(const char *key, const std::string &value) {
   auto settings = read_settings();
-  json_object_object_add(
-      settings.get(), key,
-      json_object_new_string_len(value.data(), static_cast<int>(value.size())));
+  json_object_object_add(settings.get(), key, json_object_new_string_len(value.data(), static_cast<int>(value.size())));
   return write_object(settings.get());
 }
 

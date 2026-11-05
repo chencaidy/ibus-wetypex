@@ -26,8 +26,8 @@ void finish(GObject *source, GAsyncResult *result, gpointer user_data) {
   GError *error = nullptr;
   gchar *output = nullptr;
   gchar *errors = nullptr;
-  const gboolean completed = g_subprocess_communicate_utf8_finish(
-      G_SUBPROCESS(source), result, &output, &errors, &error);
+  const gboolean completed =
+      g_subprocess_communicate_utf8_finish(G_SUBPROCESS(source), result, &output, &errors, &error);
 
   AccountReply reply;
   reply.ok = completed && g_subprocess_get_successful(G_SUBPROCESS(source));
@@ -52,8 +52,7 @@ void finish(GObject *source, GAsyncResult *result, gpointer user_data) {
 
 void run_account(std::vector<std::string> arguments, AccountCallback done) {
   const char *configured = g_getenv("WETYPE_ACCOUNT_TOOL");
-  const char *tool =
-      configured && *configured ? configured : WETYPE_ACCOUNT_TOOL;
+  const char *tool = configured && *configured ? configured : WETYPE_ACCOUNT_TOOL;
 
   std::vector<const char *> argv;
   argv.push_back(tool);
@@ -61,12 +60,10 @@ void run_account(std::vector<std::string> arguments, AccountCallback done) {
     argv.push_back(argument.c_str());
   argv.push_back(nullptr);
 
-  GSubprocessLauncher *launcher =
-      g_subprocess_launcher_new(static_cast<GSubprocessFlags>(
-          G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE));
+  GSubprocessLauncher *launcher = g_subprocess_launcher_new(
+      static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE));
   GError *error = nullptr;
-  GSubprocess *process =
-      g_subprocess_launcher_spawnv(launcher, argv.data(), &error);
+  GSubprocess *process = g_subprocess_launcher_spawnv(launcher, argv.data(), &error);
   g_object_unref(launcher);
   if (!process) {
     AccountReply reply;
@@ -79,8 +76,7 @@ void run_account(std::vector<std::string> arguments, AccountCallback done) {
 
   auto state = std::make_unique<State>();
   state->done = std::move(done);
-  g_subprocess_communicate_utf8_async(process, nullptr, nullptr, finish,
-                                      state.release());
+  g_subprocess_communicate_utf8_async(process, nullptr, nullptr, finish, state.release());
   g_object_unref(process);
 }
 

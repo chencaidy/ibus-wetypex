@@ -14,8 +14,7 @@ wire::Json read_json_file(const std::string &path);
 
 bool setting_bool(json_object *object, const char *key, bool fallback);
 int setting_int(json_object *object, const char *key, int fallback);
-std::string setting_string(json_object *object, const char *key,
-                           const std::string &fallback = {});
+std::string setting_string(json_object *object, const char *key, const std::string &fallback = {});
 
 bool write_setting_bool(const char *key, bool value);
 bool write_setting_int(const char *key, int value);

@@ -56,8 +56,7 @@ void reload_phrases();
 std::string trimmed(std::string text) {
   const auto not_space = [](unsigned char c) { return !std::isspace(c); };
   text.erase(text.begin(), std::find_if(text.begin(), text.end(), not_space));
-  text.erase(std::find_if(text.rbegin(), text.rend(), not_space).base(),
-             text.end());
+  text.erase(std::find_if(text.rbegin(), text.rend(), not_space).base(), text.end());
   return text;
 }
 
@@ -82,8 +81,7 @@ GtkWidget *make_group(const char *title, const char *description = nullptr) {
   GtkWidget *group = adw_preferences_group_new();
   adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(group), title);
   if (description)
-    adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(group),
-                                          description);
+    adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(group), description);
   return group;
 }
 
@@ -98,8 +96,7 @@ GtkWidget *action_row(const char *title, const char *subtitle = nullptr) {
 void on_visible_page_changed(GObject *object, GParamSpec *, gpointer);
 
 void on_switch_notify(GObject *object, GParamSpec *, gpointer) {
-  const char *key =
-      static_cast<const char *>(g_object_get_data(object, "setting-key"));
+  const char *key = static_cast<const char *>(g_object_get_data(object, "setting-key"));
   if (!key)
     return;
   const bool active = adw_switch_row_get_active(ADW_SWITCH_ROW(object));
@@ -108,28 +105,23 @@ void on_switch_notify(GObject *object, GParamSpec *, gpointer) {
     refresh_devices_page();
 }
 
-GtkWidget *switch_row(const char *title, const char *subtitle, const char *key,
-                      bool fallback) {
+GtkWidget *switch_row(const char *title, const char *subtitle, const char *key, bool fallback) {
   auto settings = read_settings();
   GtkWidget *row = adw_switch_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
   if (subtitle && *subtitle)
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle);
-  adw_switch_row_set_active(ADW_SWITCH_ROW(row),
-                            setting_bool(settings.get(), key, fallback));
+  adw_switch_row_set_active(ADW_SWITCH_ROW(row), setting_bool(settings.get(), key, fallback));
   g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(key), g_free);
-  g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify),
-                   nullptr);
+  g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify), nullptr);
   if (std::strcmp(key, "standalone") == 0)
     app.standalone_switch = row;
   return row;
 }
 
 void on_combo_string(GObject *object, GParamSpec *, gpointer) {
-  const char *key =
-      static_cast<const char *>(g_object_get_data(object, "setting-key"));
-  auto *values = static_cast<std::vector<std::string> *>(
-      g_object_get_data(object, "setting-values"));
+  const char *key = static_cast<const char *>(g_object_get_data(object, "setting-key"));
+  auto *values = static_cast<std::vector<std::string> *>(g_object_get_data(object, "setting-values"));
   if (!key || !values)
     return;
   const guint selected = adw_combo_row_get_selected(ADW_COMBO_ROW(object));
@@ -138,10 +130,8 @@ void on_combo_string(GObject *object, GParamSpec *, gpointer) {
   write_setting_string(key, (*values)[selected]);
 }
 
-GtkWidget *string_combo_row(const char *title, const char *subtitle,
-                            const char *key,
-                            const std::vector<std::string> &labels,
-                            const std::vector<std::string> &values,
+GtkWidget *string_combo_row(const char *title, const char *subtitle, const char *key,
+                            const std::vector<std::string> &labels, const std::vector<std::string> &values,
                             int current) {
   GtkWidget *row = adw_combo_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
@@ -157,27 +147,20 @@ GtkWidget *string_combo_row(const char *title, const char *subtitle,
   current = std::clamp(current, 0, static_cast<int>(labels.size()) - 1);
   adw_combo_row_set_selected(ADW_COMBO_ROW(row), static_cast<guint>(current));
   g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(key), g_free);
-  g_object_set_data_full(G_OBJECT(row), "setting-values",
-                         new std::vector<std::string>(values),
-                         [](gpointer data) {
-                           delete static_cast<std::vector<std::string> *>(data);
-                         });
-  g_signal_connect(row, "notify::selected", G_CALLBACK(on_combo_string),
-                   nullptr);
+  g_object_set_data_full(G_OBJECT(row), "setting-values", new std::vector<std::string>(values),
+                         [](gpointer data) { delete static_cast<std::vector<std::string> *>(data); });
+  g_signal_connect(row, "notify::selected", G_CALLBACK(on_combo_string), nullptr);
   return row;
 }
 
 void on_spin_value(GObject *object, GParamSpec *, gpointer) {
-  const char *key =
-      static_cast<const char *>(g_object_get_data(object, "setting-key"));
+  const char *key = static_cast<const char *>(g_object_get_data(object, "setting-key"));
   if (!key)
     return;
-  write_setting_int(
-      key, static_cast<int>(adw_spin_row_get_value(ADW_SPIN_ROW(object))));
+  write_setting_int(key, static_cast<int>(adw_spin_row_get_value(ADW_SPIN_ROW(object))));
 }
 
-GtkWidget *spin_row(const char *title, const char *subtitle, const char *key,
-                    int minimum, int maximum, int current) {
+GtkWidget *spin_row(const char *title, const char *subtitle, const char *key, int minimum, int maximum, int current) {
   GtkWidget *row = adw_spin_row_new_with_range(minimum, maximum, 1);
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
   if (subtitle && *subtitle)
@@ -193,24 +176,18 @@ struct SwitchOption {
   const char *key;
 };
 
-void add_switch_rows(GtkWidget *expander,
-                     const std::vector<SwitchOption> &options,
-                     json_object *settings) {
+void add_switch_rows(GtkWidget *expander, const std::vector<SwitchOption> &options, json_object *settings) {
   for (const auto &option : options) {
     GtkWidget *row = adw_switch_row_new();
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), option.label);
-    adw_switch_row_set_active(ADW_SWITCH_ROW(row),
-                              setting_bool(settings, option.key, false));
-    g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(option.key),
-                           g_free);
-    g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify),
-                     nullptr);
+    adw_switch_row_set_active(ADW_SWITCH_ROW(row), setting_bool(settings, option.key, false));
+    g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(option.key), g_free);
+    g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify), nullptr);
     adw_expander_row_add_row(ADW_EXPANDER_ROW(expander), row);
   }
 }
 
-GtkWidget *mode_row(const char *title, const char *subtitle,
-                    GtkCheckButton *radio) {
+GtkWidget *mode_row(const char *title, const char *subtitle, GtkCheckButton *radio) {
   GtkWidget *row = adw_action_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
   if (subtitle && *subtitle)
@@ -220,24 +197,20 @@ GtkWidget *mode_row(const char *title, const char *subtitle,
 }
 
 void on_scheme_selected(GObject *object, GParamSpec *, gpointer) {
-  const char *key =
-      static_cast<const char *>(g_object_get_data(object, "setting-key"));
+  const char *key = static_cast<const char *>(g_object_get_data(object, "setting-key"));
   if (!key)
     return;
   const guint selected = adw_combo_row_get_selected(ADW_COMBO_ROW(object));
   if (selected == GTK_INVALID_LIST_POSITION)
     return;
   write_setting_int(key, static_cast<int>(selected));
-  auto *radio =
-      static_cast<GtkCheckButton *>(g_object_get_data(object, "mode-radio"));
+  auto *radio = static_cast<GtkCheckButton *>(g_object_get_data(object, "mode-radio"));
   if (radio && !gtk_check_button_get_active(radio))
     gtk_check_button_set_active(radio, TRUE);
 }
 
-GtkWidget *scheme_combo_row(const char *title, const char *subtitle,
-                            const char *key, GtkCheckButton *radio,
-                            const std::vector<std::string> &items,
-                            int current) {
+GtkWidget *scheme_combo_row(const char *title, const char *subtitle, const char *key, GtkCheckButton *radio,
+                            const std::vector<std::string> &items, int current) {
   GtkWidget *row = adw_combo_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
   if (subtitle && *subtitle)
@@ -254,8 +227,7 @@ GtkWidget *scheme_combo_row(const char *title, const char *subtitle,
   adw_action_row_add_prefix(ADW_ACTION_ROW(row), GTK_WIDGET(radio));
   g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(key), g_free);
   g_object_set_data(G_OBJECT(row), "mode-radio", radio);
-  g_signal_connect(row, "notify::selected", G_CALLBACK(on_scheme_selected),
-                   nullptr);
+  g_signal_connect(row, "notify::selected", G_CALLBACK(on_scheme_selected), nullptr);
   return row;
 }
 
@@ -269,8 +241,7 @@ void update_mode_sensitivity(const std::string &mode) {
 void on_mode_toggled(GtkCheckButton *button, gpointer) {
   if (!gtk_check_button_get_active(button))
     return;
-  const char *mode = static_cast<const char *>(
-      g_object_get_data(G_OBJECT(button), "input-mode"));
+  const char *mode = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "input-mode"));
   if (!mode)
     return;
   write_setting_string("input_mode", mode);
@@ -297,9 +268,7 @@ struct PhraseDialogState {
   bool saving = false;
 };
 
-void on_phrase_dialog_destroy(GtkWidget *, gpointer data) {
-  static_cast<PhraseDialogState *>(data)->closed = true;
-}
+void on_phrase_dialog_destroy(GtkWidget *, gpointer data) { static_cast<PhraseDialogState *>(data)->closed = true; }
 
 void on_save_phrase(GtkButton *, gpointer data) {
   auto *state = static_cast<PhraseDialogState *>(data);
@@ -334,9 +303,7 @@ void on_save_phrase(GtkButton *, gpointer data) {
       } else {
         state->saving = false;
         gtk_widget_set_sensitive(state->save, TRUE);
-        gtk_label_set_text(GTK_LABEL(state->status), reply.error.empty()
-                                                         ? kPhraseSaveFailed
-                                                         : reply.error.c_str());
+        gtk_label_set_text(GTK_LABEL(state->status), reply.error.empty() ? kPhraseSaveFailed : reply.error.c_str());
       }
     }
     g_object_unref(state->window);
@@ -348,23 +315,19 @@ void show_phrase_dialog(GtkWindow *parent, GtkWidget *existing) {
   std::string key;
   std::string words;
   if (existing) {
-    const char *value = static_cast<const char *>(
-        g_object_get_data(G_OBJECT(existing), "hotword-id"));
+    const char *value = static_cast<const char *>(g_object_get_data(G_OBJECT(existing), "hotword-id"));
     if (value)
       id = value;
-    value = static_cast<const char *>(
-        g_object_get_data(G_OBJECT(existing), "hotword-key"));
+    value = static_cast<const char *>(g_object_get_data(G_OBJECT(existing), "hotword-key"));
     if (value)
       key = value;
-    value = static_cast<const char *>(
-        g_object_get_data(G_OBJECT(existing), "hotword-words"));
+    value = static_cast<const char *>(g_object_get_data(G_OBJECT(existing), "hotword-words"));
     if (value)
       words = value;
   }
 
   GtkWidget *window = adw_window_new();
-  gtk_window_set_title(GTK_WINDOW(window), id.empty() ? kPhraseDialogAddTitle
-                                                      : kPhraseDialogEditTitle);
+  gtk_window_set_title(GTK_WINDOW(window), id.empty() ? kPhraseDialogAddTitle : kPhraseDialogEditTitle);
   gtk_window_set_default_size(GTK_WINDOW(window), 480, 420);
   gtk_window_set_modal(GTK_WINDOW(window), TRUE);
   if (parent)
@@ -387,12 +350,10 @@ void show_phrase_dialog(GtkWindow *parent, GtkWidget *existing) {
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(key_row), kPhraseKeyTitle);
   gtk_editable_set_text(GTK_EDITABLE(key_row), key.c_str());
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(key_group), key_row);
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(key_group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(key_group));
 
   GtkWidget *words_group = adw_preferences_group_new();
-  adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(words_group),
-                                  kPhraseWordsLabel);
+  adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(words_group), kPhraseWordsLabel);
 
   GtkWidget *text_view = gtk_text_view_new();
   gtk_widget_add_css_class(text_view, "inline");
@@ -401,12 +362,10 @@ void show_phrase_dialog(GtkWindow *parent, GtkWidget *existing) {
   gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(text_view), 12);
   gtk_text_view_set_left_margin(GTK_TEXT_VIEW(text_view), 12);
   gtk_text_view_set_right_margin(GTK_TEXT_VIEW(text_view), 12);
-  GtkTextBuffer *text_buffer =
-      gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+  GtkTextBuffer *text_buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
   gtk_text_buffer_set_text(text_buffer, words.c_str(), -1);
   GtkWidget *text_scroll = gtk_scrolled_window_new();
-  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(text_scroll),
-                                 GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(text_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(text_scroll), text_view);
   gtk_widget_set_size_request(text_scroll, -1, 180);
   gtk_widget_add_css_class(text_scroll, "card");
@@ -416,21 +375,16 @@ void show_phrase_dialog(GtkWindow *parent, GtkWidget *existing) {
   gtk_widget_set_margin_top(status, 6);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(words_group), status);
 
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(words_group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(words_group));
 
   adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), page);
   adw_window_set_content(ADW_WINDOW(window), toolbar);
 
-  auto *state =
-      new PhraseDialogState{window, text_view, key_row, status, save, id};
-  g_object_set_data_full(
-      G_OBJECT(window), "phrase-dialog-state", state,
-      [](gpointer data) { delete static_cast<PhraseDialogState *>(data); });
-  g_signal_connect(window, "destroy", G_CALLBACK(on_phrase_dialog_destroy),
-                   state);
-  g_signal_connect_swapped(cancel, "clicked", G_CALLBACK(gtk_window_destroy),
-                           window);
+  auto *state = new PhraseDialogState{window, text_view, key_row, status, save, id};
+  g_object_set_data_full(G_OBJECT(window), "phrase-dialog-state", state,
+                         [](gpointer data) { delete static_cast<PhraseDialogState *>(data); });
+  g_signal_connect(window, "destroy", G_CALLBACK(on_phrase_dialog_destroy), state);
+  g_signal_connect_swapped(cancel, "clicked", G_CALLBACK(gtk_window_destroy), window);
   g_signal_connect(save, "clicked", G_CALLBACK(on_save_phrase), state);
   gtk_window_set_default_widget(GTK_WINDOW(window), save);
   gtk_window_present(GTK_WINDOW(window));
@@ -442,15 +396,13 @@ void on_add_phrase(GtkButton *, gpointer) {
 }
 
 void on_edit_phrase(GtkButton *button, gpointer) {
-  GtkWidget *row = static_cast<GtkWidget *>(
-      g_object_get_data(G_OBJECT(button), "phrase-row"));
+  GtkWidget *row = static_cast<GtkWidget *>(g_object_get_data(G_OBJECT(button), "phrase-row"));
   if (row && app.window)
     show_phrase_dialog(GTK_WINDOW(app.window), row);
 }
 
 void on_delete_phrase(GtkButton *button, gpointer) {
-  const char *id = static_cast<const char *>(
-      g_object_get_data(G_OBJECT(button), "hotword-id"));
+  const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "hotword-id"));
   if (!id || !*id)
     return;
   const std::string phrase_id(id);
@@ -498,15 +450,11 @@ void reload_phrases() {
           continue;
 
         GtkWidget *row = action_row(words.c_str(), key.c_str());
-        g_object_set_data_full(G_OBJECT(row), "hotword-id",
-                               g_strdup(id.c_str()), g_free);
-        g_object_set_data_full(G_OBJECT(row), "hotword-key",
-                               g_strdup(key.c_str()), g_free);
-        g_object_set_data_full(G_OBJECT(row), "hotword-words",
-                               g_strdup(words.c_str()), g_free);
+        g_object_set_data_full(G_OBJECT(row), "hotword-id", g_strdup(id.c_str()), g_free);
+        g_object_set_data_full(G_OBJECT(row), "hotword-key", g_strdup(key.c_str()), g_free);
+        g_object_set_data_full(G_OBJECT(row), "hotword-words", g_strdup(words.c_str()), g_free);
 
-        GtkWidget *edit =
-            gtk_button_new_from_icon_name("document-edit-symbolic");
+        GtkWidget *edit = gtk_button_new_from_icon_name("document-edit-symbolic");
         gtk_widget_add_css_class(edit, "flat");
         gtk_widget_set_tooltip_text(edit, kEditTooltip);
         gtk_widget_set_valign(edit, GTK_ALIGN_CENTER);
@@ -514,15 +462,12 @@ void reload_phrases() {
         g_signal_connect(edit, "clicked", G_CALLBACK(on_edit_phrase), nullptr);
         adw_action_row_add_suffix(ADW_ACTION_ROW(row), edit);
 
-        GtkWidget *remove =
-            gtk_button_new_from_icon_name("user-trash-symbolic");
+        GtkWidget *remove = gtk_button_new_from_icon_name("user-trash-symbolic");
         gtk_widget_add_css_class(remove, "flat");
         gtk_widget_set_tooltip_text(remove, kDeleteTooltip);
         gtk_widget_set_valign(remove, GTK_ALIGN_CENTER);
-        g_object_set_data_full(G_OBJECT(remove), "hotword-id",
-                               g_strdup(id.c_str()), g_free);
-        g_signal_connect(remove, "clicked", G_CALLBACK(on_delete_phrase),
-                         nullptr);
+        g_object_set_data_full(G_OBJECT(remove), "hotword-id", g_strdup(id.c_str()), g_free);
+        g_signal_connect(remove, "clicked", G_CALLBACK(on_delete_phrase), nullptr);
         adw_action_row_add_suffix(ADW_ACTION_ROW(row), remove);
 
         adw_preferences_group_add(ADW_PREFERENCES_GROUP(app.phrase_group), row);
@@ -543,8 +488,7 @@ std::string local_device_name() {
   gchar *contents = nullptr;
   gsize length = 0;
   std::string name;
-  if (g_file_get_contents("/sys/class/dmi/id/product_name", &contents, &length,
-                          nullptr)) {
+  if (g_file_get_contents("/sys/class/dmi/id/product_name", &contents, &length, nullptr)) {
     name = trimmed(std::string(contents, length));
     g_free(contents);
   }
@@ -598,13 +542,12 @@ void pairing_call(PairingState *state, std::vector<std::string> arguments,
     return;
   state->in_flight = true;
   g_object_ref(state->window);
-  run_account(std::move(arguments),
-              [state, done = std::move(done)](AccountReply reply) {
-                state->in_flight = false;
-                if (!state->closed && done)
-                  done(reply);
-                g_object_unref(state->window);
-              });
+  run_account(std::move(arguments), [state, done = std::move(done)](AccountReply reply) {
+    state->in_flight = false;
+    if (!state->closed && done)
+      done(reply);
+    g_object_unref(state->window);
+  });
 }
 
 gboolean pairing_poll(gpointer data);
@@ -637,58 +580,55 @@ gboolean pairing_poll(gpointer data) {
   if (state->in_flight)
     return G_SOURCE_CONTINUE;
 
-  pairing_call(state, {"pairing-status", state->match_code},
-               [state](const AccountReply &reply) {
-                 auto json = wire::parse(reply.output);
-                 if (!account_ok(reply) || !json)
-                   return;
-                 const int status = setting_int(json.get(), "status", -1);
-                 if (status == 0)
-                   return;
-                 if (status == 1) {
-                   const std::string bind = wire::str(json.get(), "bind_id");
-                   if (bind.empty())
-                     return;
-                   auto *reconfirm = wire::get(json.get(), "show_reconfirm");
-                   if (reconfirm && json_object_get_boolean(reconfirm)) {
-                     pairing_set_status(state, kPairingConfirmOnOther);
-                     return;
-                   }
-                   state->confirmed = true;
-                   if (state->timer) {
-                     g_source_remove(state->timer);
-                     state->timer = 0;
-                   }
-                   pairing_set_status(state, kPairingConfirming);
-                   pairing_call(state, {"confirm-bind", bind},
-                                [state](const AccountReply &confirm) {
-                                  if (account_ok(confirm)) {
-                                    pairing_set_status(state, kPairingSuccess);
-                                    refresh_devices_page();
-                                    g_timeout_add(
-                                        900,
-                                        [](gpointer window) {
-                                          if (GTK_IS_WINDOW(window))
-                                            gtk_window_destroy(
-                                                GTK_WINDOW(window));
-                                          return G_SOURCE_REMOVE;
-                                        },
-                                        state->window);
-                                  } else {
-                                    state->confirmed = false;
-                                    pairing_set_status(state, kPairingFailed);
-                                  }
-                                });
-                   return;
-                 }
-                 if (status == 2) {
-                   if (state->timer) {
-                     g_source_remove(state->timer);
-                     state->timer = 0;
-                   }
-                   pairing_set_status(state, kPairingCodeExpired);
-                 }
-               });
+  pairing_call(state, {"pairing-status", state->match_code}, [state](const AccountReply &reply) {
+    auto json = wire::parse(reply.output);
+    if (!account_ok(reply) || !json)
+      return;
+    const int status = setting_int(json.get(), "status", -1);
+    if (status == 0)
+      return;
+    if (status == 1) {
+      const std::string bind = wire::str(json.get(), "bind_id");
+      if (bind.empty())
+        return;
+      auto *reconfirm = wire::get(json.get(), "show_reconfirm");
+      if (reconfirm && json_object_get_boolean(reconfirm)) {
+        pairing_set_status(state, kPairingConfirmOnOther);
+        return;
+      }
+      state->confirmed = true;
+      if (state->timer) {
+        g_source_remove(state->timer);
+        state->timer = 0;
+      }
+      pairing_set_status(state, kPairingConfirming);
+      pairing_call(state, {"confirm-bind", bind}, [state](const AccountReply &confirm) {
+        if (account_ok(confirm)) {
+          pairing_set_status(state, kPairingSuccess);
+          refresh_devices_page();
+          g_timeout_add(
+              900,
+              [](gpointer window) {
+                if (GTK_IS_WINDOW(window))
+                  gtk_window_destroy(GTK_WINDOW(window));
+                return G_SOURCE_REMOVE;
+              },
+              state->window);
+        } else {
+          state->confirmed = false;
+          pairing_set_status(state, kPairingFailed);
+        }
+      });
+      return;
+    }
+    if (status == 2) {
+      if (state->timer) {
+        g_source_remove(state->timer);
+        state->timer = 0;
+      }
+      pairing_set_status(state, kPairingCodeExpired);
+    }
+  });
   return G_SOURCE_CONTINUE;
 }
 
@@ -746,9 +686,8 @@ void show_pairing_window(GtkWindow *parent) {
   state->window = window;
   state->status = status;
   state->code = code;
-  g_object_set_data_full(
-      G_OBJECT(window), "pairing-state", state,
-      [](gpointer data) { delete static_cast<PairingState *>(data); });
+  g_object_set_data_full(G_OBJECT(window), "pairing-state", state,
+                         [](gpointer data) { delete static_cast<PairingState *>(data); });
   g_signal_connect(window, "destroy", G_CALLBACK(on_pairing_destroy), state);
   pairing_start_code(state);
   gtk_window_present(GTK_WINDOW(window));
@@ -760,8 +699,7 @@ void set_sync_status(const char *text) {
 }
 
 void set_sync_switches_sensitive(bool sensitive) {
-  for (auto *control :
-       {app.sync_clipboard, app.sync_phrase, app.sync_dictionary})
+  for (auto *control : {app.sync_clipboard, app.sync_phrase, app.sync_dictionary})
     if (control)
       gtk_widget_set_sensitive(control, sensitive);
 }
@@ -769,74 +707,54 @@ void set_sync_switches_sensitive(bool sensitive) {
 void on_sync_switch(GObject *, GParamSpec *, gpointer) {
   if (app.sync_updating || !app.sync_group)
     return;
-  const bool clipboard =
-      app.sync_clipboard &&
-      adw_switch_row_get_active(ADW_SWITCH_ROW(app.sync_clipboard));
-  const bool phrase = app.sync_phrase && adw_switch_row_get_active(
-                                             ADW_SWITCH_ROW(app.sync_phrase));
-  const bool dictionary =
-      app.sync_dictionary &&
-      adw_switch_row_get_active(ADW_SWITCH_ROW(app.sync_dictionary));
-  const int mask = (app.sync_functions & ~7) | (clipboard ? 1 : 0) |
-                   (phrase ? 2 : 0) | (dictionary ? 4 : 0);
+  const bool clipboard = app.sync_clipboard && adw_switch_row_get_active(ADW_SWITCH_ROW(app.sync_clipboard));
+  const bool phrase = app.sync_phrase && adw_switch_row_get_active(ADW_SWITCH_ROW(app.sync_phrase));
+  const bool dictionary = app.sync_dictionary && adw_switch_row_get_active(ADW_SWITCH_ROW(app.sync_dictionary));
+  const int mask = (app.sync_functions & ~7) | (clipboard ? 1 : 0) | (phrase ? 2 : 0) | (dictionary ? 4 : 0);
   app.sync_updating = true;
   set_sync_switches_sensitive(false);
 
-  GtkWidget *clipboard_switch =
-      app.sync_clipboard ? g_object_ref(app.sync_clipboard) : nullptr;
-  GtkWidget *phrase_switch =
-      app.sync_phrase ? g_object_ref(app.sync_phrase) : nullptr;
-  GtkWidget *dictionary_switch =
-      app.sync_dictionary ? g_object_ref(app.sync_dictionary) : nullptr;
-  GtkWidget *status =
-      app.sync_status_row ? g_object_ref(app.sync_status_row) : nullptr;
+  GtkWidget *clipboard_switch = app.sync_clipboard ? g_object_ref(app.sync_clipboard) : nullptr;
+  GtkWidget *phrase_switch = app.sync_phrase ? g_object_ref(app.sync_phrase) : nullptr;
+  GtkWidget *dictionary_switch = app.sync_dictionary ? g_object_ref(app.sync_dictionary) : nullptr;
+  GtkWidget *status = app.sync_status_row ? g_object_ref(app.sync_status_row) : nullptr;
 
-  run_account(
-      {"set-functions", std::to_string(app.sync_group), std::to_string(mask)},
-      [mask, clipboard_switch, phrase_switch, dictionary_switch,
-       status](AccountReply reply) {
-        if (account_ok(reply)) {
-          app.sync_functions = mask;
-          write_setting_bool("device_clipboard_sync", (mask & 1) != 0);
-          write_setting_bool("device_phrase_sync", (mask & 2) != 0);
-          write_setting_bool("device_dictionary_sync", (mask & 4) != 0);
-          if (status)
-            adw_action_row_set_subtitle(ADW_ACTION_ROW(status),
-                                        kSyncSettingsUpdated);
-          run_account({"sync-now", "--refresh-state"}, [](AccountReply) {});
-        } else {
-          app.sync_updating = true;
-          if (clipboard_switch)
-            adw_switch_row_set_active(ADW_SWITCH_ROW(clipboard_switch),
-                                      (app.sync_functions & 1) != 0);
-          if (phrase_switch)
-            adw_switch_row_set_active(ADW_SWITCH_ROW(phrase_switch),
-                                      (app.sync_functions & 2) != 0);
-          if (dictionary_switch)
-            adw_switch_row_set_active(ADW_SWITCH_ROW(dictionary_switch),
-                                      (app.sync_functions & 4) != 0);
-          app.sync_updating = false;
-          if (status)
-            adw_action_row_set_subtitle(ADW_ACTION_ROW(status),
-                                        reply.error.empty()
-                                            ? kSyncSettingsUpdateFailed
-                                            : reply.error.c_str());
-        }
-        app.sync_updating = false;
-        for (auto *control :
-             {clipboard_switch, phrase_switch, dictionary_switch}) {
-          if (control) {
-            gtk_widget_set_sensitive(control, TRUE);
-            g_object_unref(control);
-          }
-        }
-        if (status)
-          g_object_unref(status);
-      });
+  run_account({"set-functions", std::to_string(app.sync_group), std::to_string(mask)},
+              [mask, clipboard_switch, phrase_switch, dictionary_switch, status](AccountReply reply) {
+                if (account_ok(reply)) {
+                  app.sync_functions = mask;
+                  write_setting_bool("device_clipboard_sync", (mask & 1) != 0);
+                  write_setting_bool("device_phrase_sync", (mask & 2) != 0);
+                  write_setting_bool("device_dictionary_sync", (mask & 4) != 0);
+                  if (status)
+                    adw_action_row_set_subtitle(ADW_ACTION_ROW(status), kSyncSettingsUpdated);
+                  run_account({"sync-now", "--refresh-state"}, [](AccountReply) {});
+                } else {
+                  app.sync_updating = true;
+                  if (clipboard_switch)
+                    adw_switch_row_set_active(ADW_SWITCH_ROW(clipboard_switch), (app.sync_functions & 1) != 0);
+                  if (phrase_switch)
+                    adw_switch_row_set_active(ADW_SWITCH_ROW(phrase_switch), (app.sync_functions & 2) != 0);
+                  if (dictionary_switch)
+                    adw_switch_row_set_active(ADW_SWITCH_ROW(dictionary_switch), (app.sync_functions & 4) != 0);
+                  app.sync_updating = false;
+                  if (status)
+                    adw_action_row_set_subtitle(ADW_ACTION_ROW(status),
+                                                reply.error.empty() ? kSyncSettingsUpdateFailed : reply.error.c_str());
+                }
+                app.sync_updating = false;
+                for (auto *control : {clipboard_switch, phrase_switch, dictionary_switch}) {
+                  if (control) {
+                    gtk_widget_set_sensitive(control, TRUE);
+                    g_object_unref(control);
+                  }
+                }
+                if (status)
+                  g_object_unref(status);
+              });
 }
 
-GtkWidget *sync_switch_row(const char *title, const char *subtitle, bool value,
-                           GtkWidget **out_control) {
+GtkWidget *sync_switch_row(const char *title, const char *subtitle, bool value, GtkWidget **out_control) {
   GtkWidget *row = adw_switch_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
   if (subtitle && *subtitle)
@@ -849,8 +767,7 @@ GtkWidget *sync_switch_row(const char *title, const char *subtitle, bool value,
 }
 
 void add_device_group(GtkWidget *group) {
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(app.devices_page),
-                           ADW_PREFERENCES_GROUP(group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(app.devices_page), ADW_PREFERENCES_GROUP(group));
   app.device_groups.push_back(group);
 }
 
@@ -858,8 +775,7 @@ void refresh_devices_page() {
   if (!app.devices_page)
     return;
   for (auto *group : app.device_groups)
-    adw_preferences_page_remove(ADW_PREFERENCES_PAGE(app.devices_page),
-                                ADW_PREFERENCES_GROUP(group));
+    adw_preferences_page_remove(ADW_PREFERENCES_PAGE(app.devices_page), ADW_PREFERENCES_GROUP(group));
   app.device_groups.clear();
   app.sync_clipboard = app.sync_phrase = app.sync_dictionary = nullptr;
   app.sync_status_row = nullptr;
@@ -869,23 +785,20 @@ void refresh_devices_page() {
   auto settings = read_settings();
   if (setting_bool(settings.get(), "standalone", false)) {
     GtkWidget *group = make_group(kDevicesGroupTitle);
-    adw_preferences_group_add(
-        ADW_PREFERENCES_GROUP(group),
-        action_row(kStandaloneDeviceTitle, kStandaloneDeviceSubtitle));
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(group),
+                              action_row(kStandaloneDeviceTitle, kStandaloneDeviceSubtitle));
     add_device_group(group);
     return;
   }
 
-  gchar *sync_path = g_build_filename(g_get_user_data_dir(), "wetypex",
-                                      "state", "sync-state.json", nullptr);
+  gchar *sync_path = g_build_filename(g_get_user_data_dir(), "wetypex", "state", "sync-state.json", nullptr);
   auto sync = read_json_file(sync_path);
   g_free(sync_path);
   const int group_id = setting_int(sync.get(), "group_id", 0);
   const int functions = setting_int(sync.get(), "func_switch", 0);
 
   if (group_id <= 0) {
-    GtkWidget *group =
-        make_group(kDevicesGroupTitle, kDevicesNotPairedDescription);
+    GtkWidget *group = make_group(kDevicesGroupTitle, kDevicesNotPairedDescription);
     GtkWidget *row = action_row(kPairDeviceTitle, kPairDeviceSubtitle);
     GtkWidget *button = gtk_button_new_with_label(kPairActionLabel);
     gtk_widget_add_css_class(button, "suggested-action");
@@ -907,50 +820,41 @@ void refresh_devices_page() {
   GtkWidget *sync_group = make_group(kGroupSyncFeatures);
   adw_preferences_group_add(
       ADW_PREFERENCES_GROUP(sync_group),
-      sync_switch_row(kSyncClipboardTitle, kSyncClipboardSubtitle,
-                      (functions & 1) != 0, &app.sync_clipboard));
+      sync_switch_row(kSyncClipboardTitle, kSyncClipboardSubtitle, (functions & 1) != 0, &app.sync_clipboard));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(sync_group), sync_switch_row(kSyncPhraseTitle, kSyncPhraseSubtitle,
+                                                                               (functions & 2) != 0, &app.sync_phrase));
   adw_preferences_group_add(
       ADW_PREFERENCES_GROUP(sync_group),
-      sync_switch_row(kSyncPhraseTitle, kSyncPhraseSubtitle,
-                      (functions & 2) != 0, &app.sync_phrase));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(sync_group),
-      sync_switch_row(kSyncDictionaryTitle, kSyncDictionarySubtitle,
-                      (functions & 4) != 0, &app.sync_dictionary));
+      sync_switch_row(kSyncDictionaryTitle, kSyncDictionarySubtitle, (functions & 4) != 0, &app.sync_dictionary));
 
   GtkWidget *sync_now_row = action_row(kSyncNowTitle, kSyncNowSubtitle);
   GtkWidget *sync_now = gtk_button_new_with_label(kSyncNowActionLabel);
   gtk_widget_set_valign(sync_now, GTK_ALIGN_CENTER);
-  g_signal_connect(
-      sync_now, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-        gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
-        g_object_ref(button);
-        run_account({"sync-now"}, [button](AccountReply reply) {
-          gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
-          set_sync_status(account_ok(reply)
-                              ? kSyncRequested
-                              : (reply.error.empty() ? kSyncRequestFailed
-                                                     : reply.error.c_str()));
-          g_object_unref(button);
-        });
-      }),
-      nullptr);
+  g_signal_connect(sync_now, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+                     g_object_ref(button);
+                     run_account({"sync-now"}, [button](AccountReply reply) {
+                       gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
+                       set_sync_status(account_ok(reply)
+                                           ? kSyncRequested
+                                           : (reply.error.empty() ? kSyncRequestFailed : reply.error.c_str()));
+                       g_object_unref(button);
+                     });
+                   }),
+                   nullptr);
   adw_action_row_add_suffix(ADW_ACTION_ROW(sync_now_row), sync_now);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(sync_group), sync_now_row);
 
   app.sync_status_row = action_row(kSyncStatusTitle, kSyncStatusDescription);
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(sync_group),
-                            app.sync_status_row);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(sync_group), app.sync_status_row);
   add_device_group(sync_group);
 
   GtkWidget *manage_group = make_group(kGroupDeviceManagement);
-  GtkWidget *associate =
-      action_row(kAssociateDeviceTitle, kAssociateDeviceSubtitle);
+  GtkWidget *associate = action_row(kAssociateDeviceTitle, kAssociateDeviceSubtitle);
   GtkWidget *associate_button = gtk_button_new_with_label(kPairActionLabel);
   gtk_widget_add_css_class(associate_button, "suggested-action");
   gtk_widget_set_valign(associate_button, GTK_ALIGN_CENTER);
-  g_signal_connect(associate_button, "clicked",
-                   G_CALLBACK(+[](GtkButton *, gpointer) {
+  g_signal_connect(associate_button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer) {
                      if (app.window)
                        show_pairing_window(GTK_WINDOW(app.window));
                    }),
@@ -993,22 +897,19 @@ void refresh_devices_page() {
     }
   }
   if (!local_found) {
-    adw_preferences_group_add(
-        ADW_PREFERENCES_GROUP(device_group),
-        action_row(local_device_name().c_str(), kLocalDeviceSubtitle));
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(device_group),
+                              action_row(local_device_name().c_str(), kLocalDeviceSubtitle));
   }
   for (const auto &entry : entries) {
-    adw_preferences_group_add(
-        ADW_PREFERENCES_GROUP(device_group),
-        action_row(entry.name.c_str(), entry.subtitle.c_str()));
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(device_group),
+                              action_row(entry.name.c_str(), entry.subtitle.c_str()));
   }
   add_device_group(device_group);
 }
 
 GtkWidget *build_input_page() {
   auto settings = read_settings();
-  GtkWidget *page =
-      make_page("input", kPageInputTitle, "input-keyboard-symbolic");
+  GtkWidget *page = make_page("input", kPageInputTitle, "input-keyboard-symbolic");
 
   std::string mode = setting_string(settings.get(), "input_mode");
   if (mode.empty())
@@ -1022,103 +923,71 @@ GtkWidget *build_input_page() {
   GtkWidget *pinyin = gtk_check_button_new();
   GtkWidget *double_pinyin = gtk_check_button_new();
   GtkWidget *wubi = gtk_check_button_new();
-  gtk_accessible_update_property(GTK_ACCESSIBLE(pinyin),
-                                 GTK_ACCESSIBLE_PROPERTY_LABEL,
-                                 kInputPinyinTitle, -1);
-  gtk_accessible_update_property(GTK_ACCESSIBLE(double_pinyin),
-                                 GTK_ACCESSIBLE_PROPERTY_LABEL,
-                                 kInputDoublePinyinTitle, -1);
-  gtk_accessible_update_property(
-      GTK_ACCESSIBLE(wubi), GTK_ACCESSIBLE_PROPERTY_LABEL, kInputWubiTitle, -1);
-  gtk_check_button_set_group(GTK_CHECK_BUTTON(double_pinyin),
-                             GTK_CHECK_BUTTON(pinyin));
+  gtk_accessible_update_property(GTK_ACCESSIBLE(pinyin), GTK_ACCESSIBLE_PROPERTY_LABEL, kInputPinyinTitle, -1);
+  gtk_accessible_update_property(GTK_ACCESSIBLE(double_pinyin), GTK_ACCESSIBLE_PROPERTY_LABEL, kInputDoublePinyinTitle,
+                                 -1);
+  gtk_accessible_update_property(GTK_ACCESSIBLE(wubi), GTK_ACCESSIBLE_PROPERTY_LABEL, kInputWubiTitle, -1);
+  gtk_check_button_set_group(GTK_CHECK_BUTTON(double_pinyin), GTK_CHECK_BUTTON(pinyin));
   gtk_check_button_set_group(GTK_CHECK_BUTTON(wubi), GTK_CHECK_BUTTON(pinyin));
 
-  GtkWidget *active = mode == "wubi"            ? wubi
-                      : mode == "double_pinyin" ? double_pinyin
-                                                : pinyin;
+  GtkWidget *active = mode == "wubi" ? wubi : mode == "double_pinyin" ? double_pinyin : pinyin;
   gtk_check_button_set_active(GTK_CHECK_BUTTON(active), TRUE);
   for (auto *button : {pinyin, double_pinyin, wubi}) {
-    const char *value = button == wubi            ? "wubi"
-                        : button == double_pinyin ? "double_pinyin"
-                                                  : "pinyin";
-    g_object_set_data(G_OBJECT(button), "input-mode",
-                      const_cast<char *>(value));
+    const char *value = button == wubi ? "wubi" : button == double_pinyin ? "double_pinyin" : "pinyin";
+    g_object_set_data(G_OBJECT(button), "input-mode", const_cast<char *>(value));
     g_signal_connect(button, "toggled", G_CALLBACK(on_mode_toggled), nullptr);
   }
 
   GtkWidget *scheme_group = make_group(kGroupInputScheme);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
-                            mode_row(kInputPinyinTitle, kInputPinyinSubtitle,
-                                     GTK_CHECK_BUTTON(pinyin)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(scheme_group),
-      scheme_combo_row(kInputDoublePinyinTitle, kInputDoublePinyinSubtitle,
-                       "double_pinyin_scheme", GTK_CHECK_BUTTON(double_pinyin),
-                       schemes,
-                       setting_int(settings.get(), "double_pinyin_scheme", 0)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(scheme_group),
-      scheme_combo_row(kInputWubiTitle, kInputWubiSubtitle, "wubi_solution",
-                       GTK_CHECK_BUTTON(wubi), wubi_solutions,
-                       setting_int(settings.get(), "wubi_solution", 0)));
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(scheme_group));
+                            mode_row(kInputPinyinTitle, kInputPinyinSubtitle, GTK_CHECK_BUTTON(pinyin)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
+                            scheme_combo_row(kInputDoublePinyinTitle, kInputDoublePinyinSubtitle,
+                                             "double_pinyin_scheme", GTK_CHECK_BUTTON(double_pinyin), schemes,
+                                             setting_int(settings.get(), "double_pinyin_scheme", 0)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
+                            scheme_combo_row(kInputWubiTitle, kInputWubiSubtitle, "wubi_solution",
+                                             GTK_CHECK_BUTTON(wubi), wubi_solutions,
+                                             setting_int(settings.get(), "wubi_solution", 0)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(scheme_group));
 
   GtkWidget *candidate_group = make_group(kGroupCandidates);
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(candidate_group),
-      spin_row(kPageSizeTitle, kPageSizeSubtitle, "page_size", 3, 9,
-               std::clamp(setting_int(settings.get(), "page_size", 5), 3, 9)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(candidate_group),
-      switch_row(kVerticalCandidatesTitle, kVerticalCandidatesSubtitle,
-                 "vertical", setting_bool(settings.get(), "vertical", false)));
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(candidate_group));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_group),
+                            spin_row(kPageSizeTitle, kPageSizeSubtitle, "page_size", 3, 9,
+                                     std::clamp(setting_int(settings.get(), "page_size", 5), 3, 9)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_group),
+                            switch_row(kVerticalCandidatesTitle, kVerticalCandidatesSubtitle, "vertical",
+                                       setting_bool(settings.get(), "vertical", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(candidate_group));
 
   GtkWidget *behavior_group = make_group(kGroupBehavior);
-  const std::string language =
-      setting_string(settings.get(), "default_language", "chinese");
+  const std::string language = setting_string(settings.get(), "default_language", "chinese");
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            string_combo_row(kDefaultLanguageTitle, nullptr, "default_language", kDefaultLanguageLabels,
+                                             {"chinese", "english"}, language == "english" ? 1 : 0));
   adw_preferences_group_add(
       ADW_PREFERENCES_GROUP(behavior_group),
-      string_combo_row(kDefaultLanguageTitle, nullptr, "default_language",
-                       kDefaultLanguageLabels, {"chinese", "english"},
-                       language == "english" ? 1 : 0));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kShiftSwitchTitle, nullptr, "shift_switch",
-                 setting_bool(settings.get(), "shift_switch", true)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kSmartInputTitle, kSmartInputSubtitle, "smart_input",
-                 setting_bool(settings.get(), "smart_input", true)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kEmojiRecommendTitle, kEmojiRecommendSubtitle,
-                 "emoji_recommend",
-                 setting_bool(settings.get(), "emoji_recommend", true)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kChinesePunctuationTitle, kChinesePunctuationSubtitle,
-                 "chinese_punctuation",
-                 setting_bool(settings.get(), "chinese_punctuation", true)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kSlashPunctuationTitle, kSlashPunctuationSubtitle,
-                 "slash_punctuation",
-                 setting_bool(settings.get(), "slash_punctuation", true)));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kStandaloneTitle, kStandaloneSubtitle, "standalone",
-                 setting_bool(settings.get(), "standalone", false)));
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(behavior_group));
+      switch_row(kShiftSwitchTitle, nullptr, "shift_switch", setting_bool(settings.get(), "shift_switch", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            switch_row(kSmartInputTitle, kSmartInputSubtitle, "smart_input",
+                                       setting_bool(settings.get(), "smart_input", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            switch_row(kEmojiRecommendTitle, kEmojiRecommendSubtitle, "emoji_recommend",
+                                       setting_bool(settings.get(), "emoji_recommend", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            switch_row(kChinesePunctuationTitle, kChinesePunctuationSubtitle, "chinese_punctuation",
+                                       setting_bool(settings.get(), "chinese_punctuation", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            switch_row(kSlashPunctuationTitle, kSlashPunctuationSubtitle, "slash_punctuation",
+                                       setting_bool(settings.get(), "slash_punctuation", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
+                            switch_row(kStandaloneTitle, kStandaloneSubtitle, "standalone",
+                                       setting_bool(settings.get(), "standalone", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(behavior_group));
 
   GtkWidget *advanced_group = make_group(kGroupAdvanced);
   GtkWidget *wubi_expander = adw_expander_row_new();
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(wubi_expander),
-                                kWubiOptionsTitle);
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(wubi_expander), kWubiOptionsTitle);
   add_switch_rows(wubi_expander,
                   {{kWubiPinyinMixLabel, "wubi_pinyin"},
                    {kWubiUniqueCommitLabel, "wubi_unique_commit"},
@@ -1126,23 +995,18 @@ GtkWidget *build_input_page() {
                    {kWubiWildcardCommentLabel, "wubi_wildcard_comment"}},
                   settings.get());
   g_wubi_options = wubi_expander;
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group),
-                            wubi_expander);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group), wubi_expander);
 
   GtkWidget *emoji_expander = adw_expander_row_new();
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(emoji_expander),
-                                kEmojiTypesTitle);
-  add_switch_rows(emoji_expander,
-                  {{kEmojiNormalLabel, "normal_emoji"},
-                   {kEmojiKaomojiLabel, "kaomoji"},
-                   {kEmojiSymbolLabel, "symbol_emoji"}},
-                  settings.get());
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group),
-                            emoji_expander);
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(emoji_expander), kEmojiTypesTitle);
+  add_switch_rows(
+      emoji_expander,
+      {{kEmojiNormalLabel, "normal_emoji"}, {kEmojiKaomojiLabel, "kaomoji"}, {kEmojiSymbolLabel, "symbol_emoji"}},
+      settings.get());
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group), emoji_expander);
 
   GtkWidget *fuzzy_expander = adw_expander_row_new();
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(fuzzy_expander),
-                                kFuzzyPinyinTitle);
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(fuzzy_expander), kFuzzyPinyinTitle);
   add_switch_rows(fuzzy_expander,
                   {{kFuzzyNlLabel, "fuzzy_nl"},
                    {kFuzzyRlLabel, "fuzzy_rl"},
@@ -1164,18 +1028,15 @@ GtkWidget *build_input_page() {
                    {kFuzzyAnAiLabel, "fuzzy_an_ai"},
                    {kFuzzyEngOngLabel, "fuzzy_eng_ong"}},
                   settings.get());
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group),
-                            fuzzy_expander);
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(advanced_group));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(advanced_group), fuzzy_expander);
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(advanced_group));
 
   update_mode_sensitivity(mode);
   return page;
 }
 
 GtkWidget *build_phrases_page() {
-  GtkWidget *page =
-      make_page("phrases", kPagePhrasesTitle, "user-bookmarks-symbolic");
+  GtkWidget *page = make_page("phrases", kPagePhrasesTitle, "user-bookmarks-symbolic");
   GtkWidget *group = make_group(kPhrasesGroupTitle);
   app.phrase_group = group;
 
@@ -1183,9 +1044,7 @@ GtkWidget *build_phrases_page() {
   GtkWidget *refresh = gtk_button_new_from_icon_name("view-refresh-symbolic");
   gtk_widget_add_css_class(refresh, "flat");
   gtk_widget_set_tooltip_text(refresh, kRefreshTooltip);
-  g_signal_connect(refresh, "clicked",
-                   G_CALLBACK(+[](GtkButton *, gpointer) { reload_phrases(); }),
-                   nullptr);
+  g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer) { reload_phrases(); }), nullptr);
   GtkWidget *add = gtk_button_new_from_icon_name("list-add-symbolic");
   gtk_widget_add_css_class(add, "flat");
   gtk_widget_set_tooltip_text(add, kAddPhraseTooltip);
@@ -1194,14 +1053,12 @@ GtkWidget *build_phrases_page() {
   gtk_box_append(GTK_BOX(header), add);
   adw_preferences_group_set_header_suffix(ADW_PREFERENCES_GROUP(group), header);
 
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(group));
   return page;
 }
 
 GtkWidget *build_devices_page() {
-  GtkWidget *page =
-      make_page("devices", kPageDevicesTitle, "network-workgroup-symbolic");
+  GtkWidget *page = make_page("devices", kPageDevicesTitle, "network-workgroup-symbolic");
   app.devices_page = page;
   refresh_devices_page();
   return page;
@@ -1229,21 +1086,18 @@ GtkWidget *build_about_page() {
 
   GtkWidget *hero_group = adw_preferences_group_new();
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(hero_group), hero);
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(hero_group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(hero_group));
 
   GtkWidget *developer = action_row(kDeveloperTitle, kDeveloperName);
   GtkWidget *license = action_row(kLicenseTitle, kLicenseValue);
 
   GtkWidget *website = action_row(kWebsiteTitle, kWebsite);
-  GtkWidget *website_button =
-      gtk_link_button_new_with_label(kWebsite, kOpenActionLabel);
+  GtkWidget *website_button = gtk_link_button_new_with_label(kWebsite, kOpenActionLabel);
   gtk_widget_set_valign(website_button, GTK_ALIGN_CENTER);
   adw_action_row_add_suffix(ADW_ACTION_ROW(website), website_button);
 
   GtkWidget *feedback = action_row(kFeedbackTitle, kFeedbackSubtitle);
-  GtkWidget *feedback_button =
-      gtk_link_button_new_with_label(kIssues, kOpenActionLabel);
+  GtkWidget *feedback_button = gtk_link_button_new_with_label(kIssues, kOpenActionLabel);
   gtk_widget_set_valign(feedback_button, GTK_ALIGN_CENTER);
   adw_action_row_add_suffix(ADW_ACTION_ROW(feedback), feedback_button);
 
@@ -1259,14 +1113,12 @@ GtkWidget *build_about_page() {
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(group), website);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(group), feedback);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(group), comments);
-  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page),
-                           ADW_PREFERENCES_GROUP(group));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(group));
   return page;
 }
 
 void on_visible_page_changed(GObject *object, GParamSpec *, gpointer) {
-  const char *name = adw_preferences_window_get_visible_page_name(
-      ADW_PREFERENCES_WINDOW(object));
+  const char *name = adw_preferences_window_get_visible_page_name(ADW_PREFERENCES_WINDOW(object));
   if (!name)
     return;
   if (std::strcmp(name, "phrases") == 0 && !app.phrases_loaded) {
@@ -1282,22 +1134,15 @@ GtkWidget *create_window() {
   gtk_window_set_title(GTK_WINDOW(window), kAppName);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 800);
   gtk_window_set_default_icon_name("wetypex");
-  adw_preferences_window_set_search_enabled(ADW_PREFERENCES_WINDOW(window),
-                                            FALSE);
+  adw_preferences_window_set_search_enabled(ADW_PREFERENCES_WINDOW(window), FALSE);
 
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window),
-                             ADW_PREFERENCES_PAGE(build_input_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window),
-                             ADW_PREFERENCES_PAGE(build_phrases_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window),
-                             ADW_PREFERENCES_PAGE(build_devices_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window),
-                             ADW_PREFERENCES_PAGE(build_about_page()));
+  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_input_page()));
+  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_phrases_page()));
+  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_devices_page()));
+  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_about_page()));
 
-  g_signal_connect(window, "notify::visible-page-name",
-                   G_CALLBACK(on_visible_page_changed), nullptr);
-  adw_preferences_window_set_visible_page_name(ADW_PREFERENCES_WINDOW(window),
-                                               "input");
+  g_signal_connect(window, "notify::visible-page-name", G_CALLBACK(on_visible_page_changed), nullptr);
+  adw_preferences_window_set_visible_page_name(ADW_PREFERENCES_WINDOW(window), "input");
   return window;
 }
 
@@ -1321,8 +1166,7 @@ void ensure_window() {
   if (app.application)
     g_application_hold(app.application);
   app.window = create_window();
-  g_signal_connect(app.window, "destroy", G_CALLBACK(on_window_destroy),
-                   nullptr);
+  g_signal_connect(app.window, "destroy", G_CALLBACK(on_window_destroy), nullptr);
 }
 
 void present_page(const char *page) {
@@ -1335,15 +1179,12 @@ void present_page(const char *page) {
       static const char *names[] = {"input", "phrases", "devices", "about"};
       if (index >= 0 && index < 4)
         name = names[index];
-    } else if (std::strcmp(page, "input") == 0 ||
-               std::strcmp(page, "phrases") == 0 ||
-               std::strcmp(page, "devices") == 0 ||
-               std::strcmp(page, "about") == 0) {
+    } else if (std::strcmp(page, "input") == 0 || std::strcmp(page, "phrases") == 0 ||
+               std::strcmp(page, "devices") == 0 || std::strcmp(page, "about") == 0) {
       name = page;
     }
   }
-  adw_preferences_window_set_visible_page_name(
-      ADW_PREFERENCES_WINDOW(app.window), name);
+  adw_preferences_window_set_visible_page_name(ADW_PREFERENCES_WINDOW(app.window), name);
   if (std::strcmp(name, "phrases") == 0 && !app.phrases_loaded) {
     app.phrases_loaded = true;
     reload_phrases();
@@ -1370,8 +1211,7 @@ void on_activate(GApplication *, gpointer) {
   gtk_window_present(GTK_WINDOW(app.window));
 }
 
-gint on_command_line(GApplication *, GApplicationCommandLine *command_line,
-                     gpointer) {
+gint on_command_line(GApplication *, GApplicationCommandLine *command_line, gpointer) {
   int argc = 0;
   char **argv = g_application_command_line_get_arguments(command_line, &argc);
   present_page(page_argument(argc, argv));
@@ -1385,13 +1225,11 @@ int main(int argc, char **argv) {
   g_set_prgname("wetypex-settings");
   g_set_application_name(kAppName);
 
-  GApplication *application = g_application_new(
-      "io.github.panxuc.WetypeSettings", G_APPLICATION_HANDLES_COMMAND_LINE);
+  GApplication *application = g_application_new("io.github.panxuc.WetypeSettings", G_APPLICATION_HANDLES_COMMAND_LINE);
   app.application = application;
   g_signal_connect(application, "startup", G_CALLBACK(on_startup), nullptr);
   g_signal_connect(application, "activate", G_CALLBACK(on_activate), nullptr);
-  g_signal_connect(application, "command-line", G_CALLBACK(on_command_line),
-                   nullptr);
+  g_signal_connect(application, "command-line", G_CALLBACK(on_command_line), nullptr);
 
   const int status = g_application_run(application, argc, argv);
   g_object_unref(application);
