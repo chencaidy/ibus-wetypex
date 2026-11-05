@@ -23,11 +23,11 @@ jobs:
       - name: 检查脚本
         run: |
           for script in scripts/*.sh.in; do
-            case "$script" in *-syncd.sh.in|*-update.sh.in|*-sync.sh.in) continue;; esac
+            case "$script" in *-update.sh.in|*-sync.sh.in) continue;; esac
             sh -n "$script"
           done
           python3 -m py_compile scripts/setup_runtime.py scripts/wechat_emoticons.py scripts/voice_stream.py tools/*.py \
-            build/wetypex-syncd build/wetypex-update build/wetypex-sync
+            build/wetypex-update build/wetypex-sync
       - name: 构建 Arch 软件包（启用 LTO）
         run: |
           python3 tools/package_release.py
