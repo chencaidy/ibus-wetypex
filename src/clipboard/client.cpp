@@ -68,8 +68,6 @@ struct LocalClip {
 };
 
 struct Daemon {
-  // Run mode
-  bool once = false; // --once: one sync round, then exit
   int exit_code = 0; // process exit status, set by the paths that quit the loop
 
   // Main loop and bus resources (created in main, released on exit)
@@ -78,7 +76,7 @@ struct Daemon {
   gulong closed_handler = 0; // "closed" signal on conn
   guint subscription = 0;    // match rule for the Changed signal
   guint name_watch = 0;      // watch on the extension's bus name
-  guint timer = 0;           // periodic sync_tick source, 0 once removed
+  guint timer = 0;           // periodic sync_tick source, 0 when removed
 
   // Extension link
   std::string ext_owner;      // unique name of the current owner, empty when absent
@@ -732,26 +730,12 @@ static gboolean sync_tick(gpointer data) {
   // Without the extension there is nothing to read from or write to, and the
   // cursors must not move: pause until it is back (this also retries a
   // Subscribe that failed because the object was not exported yet).
-  if (!daemon->ext_ready && !try_attach(*daemon)) {
-    if (daemon->once) {
-      g_warning("Clipboard extension is not available");
-      daemon->exit_code = 1;
-      daemon->timer = 0; // the source is removed by returning below
-      g_main_loop_quit(daemon->loop);
-      return G_SOURCE_REMOVE;
-    }
+  if (!daemon->ext_ready && !try_attach(*daemon))
     return G_SOURCE_CONTINUE;
-  }
 
-  const bool ok = sync_once(*daemon);
-  if (daemon->once) {
-    daemon->timer = 0;
-    g_main_loop_quit(daemon->loop);
-    return G_SOURCE_REMOVE;
-  }
-  if (!ok) {
+  if (!sync_once(*daemon))
     g_warning("Account sync query failed");
-  }
+
   return G_SOURCE_CONTINUE;
 }
 
@@ -768,15 +752,6 @@ static std::string tool_path(const char *variable, const char *fallback) {
   return found ? found : fallback;
 }
 
-static void print_usage(const char *prog) {
-  g_print("Usage:\n"
-          "  %s           synchronize the clipboard while the extension is running\n"
-          "  %s --once    run one synchronization round and exit\n"
-          "  %s -h        show this help\n"
-          "\n",
-          prog, prog, prog);
-}
-
 int main(int argc, char **argv) {
   setlocale(LC_ALL, "");
   signal(SIGPIPE, SIG_IGN);
@@ -784,16 +759,8 @@ int main(int argc, char **argv) {
 
   Daemon daemon;
   for (int i = 1; i < argc; i++) {
-    if (g_strcmp0(argv[i], "--once") == 0) {
-      daemon.once = true;
-    } else if (g_strcmp0(argv[i], "-h") == 0 || g_strcmp0(argv[i], "--help") == 0) {
-      print_usage(argv[0]);
-      return 0;
-    } else {
-      g_warning("Unknown argument: %s", argv[i]);
-      print_usage(argv[0]);
-      return 2;
-    }
+    g_warning("Unknown argument: %s", argv[i]);
+    return 2;
   }
 
   if (!prepare_state_dir(&daemon.state_dir))
@@ -805,6 +772,7 @@ int main(int argc, char **argv) {
     return 0; // another daemon owns the cursors
   if (lock < 0)
     return 1;
+
   load_runtime(daemon);
   // The extension only reports copies it observes. Until the user copies
   // something here, seed the local view with an empty selection: otherwise no
