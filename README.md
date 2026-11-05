@@ -130,6 +130,12 @@ wetypex-setup --check
 ibus restart
 ```
 
+跨设备剪贴板由随包安装的 GNOME Shell 扩展 `wetypex-clip-watcher@caidy.cc` 读写本地剪贴板。安装后重新登录一次让 Shell 发现新扩展，再启用它：
+
+```bash
+gnome-extensions enable wetypex-clip-watcher@caidy.cc
+```
+
 配置、原版运行时、配对身份、词库和同步状态都位于用户目录，与 `/usr` 下的软件文件分离；正常升级不会重建账户。
 
 ## 日常使用

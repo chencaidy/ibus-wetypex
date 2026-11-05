@@ -43,7 +43,7 @@ wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
 
 ## 跨设备剪贴板没有同步
 
-确认设备组的 `func_switch` 包含剪贴板位 `1`。Wayland 需要 `wl-copy` 与 `wl-paste`；X11 需要可用的 Qt 剪贴板。同步守护进程使用文件锁，避免手工同时运行多个实例。
+确认设备组的 `func_switch` 包含剪贴板位 `1`，并确认 GNOME Shell 扩展 `wetypex-clip-watcher@caidy.cc` 已安装且启用：本地剪贴板只能通过它读写。安装后需重新登录一次，然后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc`；用 `gnome-extensions list --enabled` 可确认状态。使用 `WETYPE_CLIPBOARD_DEBUG=1` 手动运行 `wetypex-clipboard` 可看到双向传输日志。同步守护进程使用文件锁，避免手工同时运行多个实例。
 
 ## 隔空传送无法连接
 

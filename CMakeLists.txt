@@ -85,8 +85,11 @@ if(NOT WETYPE_LAYER_SHELL STREQUAL "OFF")
   endif()
 endif()
 
-add_executable(wetypex-clipboard-set src/clipboard/main.cpp)
-target_link_libraries(wetypex-clipboard-set PRIVATE ${WETYPE_QT_PACKAGE}::Gui PkgConfig::WETYPE_WAYLAND)
+add_executable(wetypex-clipboard src/clipboard/client.cpp)
+target_link_libraries(wetypex-clipboard PRIVATE PkgConfig::GIO_UNIX PkgConfig::JSONC)
+target_compile_definitions(wetypex-clipboard PRIVATE
+  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account")
+target_compile_options(wetypex-clipboard PRIVATE -Wall -Wextra)
 
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
   message(FATAL_ERROR "The verified original engine sample requires Linux x86-64")
@@ -110,7 +113,7 @@ add_executable(ibus-engine-wetypex src/ibus/main.cpp)
 target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
 target_compile_definitions(ibus-engine-wetypex PRIVATE
   WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
-  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-syncd")
+  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
 target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
 
 add_executable(wetypex-settings
@@ -168,7 +171,6 @@ configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
 configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
 configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
 configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
-configure_file(scripts/wetypex-syncd.sh.in wetypex-syncd @ONLY)
 configure_file(scripts/wetypex-update.sh.in wetypex-update @ONLY)
 configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
 configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
@@ -177,7 +179,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so DESTINATION ${CMAKE_
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wcwss_bridge.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
 
 install(TARGETS wetypex-ai-viewer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(TARGETS wetypex-clipboard-set RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-clipboard RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS wetypex-settings RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS wetypex-transfer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS wetypex-vmode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -189,7 +191,6 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-syncd DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -198,6 +199,7 @@ install(PROGRAMS scripts/setup_runtime.py tools/prepare_macos_runtime.py DESTINA
 install(PROGRAMS scripts/wechat_emoticons.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 install(PROGRAMS scripts/voice_stream.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 
+install(DIRECTORY src/clipboard/wetypex-clip-watcher@caidy.cc DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions)
 install(DIRECTORY data/icons/hicolor/ DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor)
 
 install(FILES data/hyprland.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})

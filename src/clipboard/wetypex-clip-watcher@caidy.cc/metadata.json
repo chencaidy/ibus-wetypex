@@ -1,0 +1,8 @@
+{
+  "description": "Send clipboard changes to the WeTypeX",
+  "name": "WeTypeX Clip Watcher",
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/chencaidy/ibus-wetypex",
+  "uuid": "wetypex-clip-watcher@caidy.cc",
+  "version": 1
+}

@@ -19,7 +19,10 @@ WeTypeX 已安装。首次使用请依次执行：
 
   3. 打开「设置 → 键盘」，将 WeTypeX 添加到当前输入法列表。
 
-  4. 重启 IBus：
+  4. 启用跨设备剪贴板扩展（安装后需重新登录一次，Shell 才能发现它）：
+     gnome-extensions enable wetypex-clip-watcher@caidy.cc
+
+  5. 重启 IBus：
      ibus restart
 
 完整说明：https://github.com/chencaidy/ibus-wetypex#首次设置

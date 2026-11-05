@@ -15,7 +15,7 @@ WeTypeX 将原版桌面输入核心接入 IBus，同时让 Linux 桌面负责输
 | `wcwss_bridge.so` | 将原版网络调用桥接到 Linux curl/TLS/WebSocket |
 | `wetypex-backend` | 在 Bubblewrap 中启动持久输入服务 |
 | `wetypex-account` | 执行配对、设备组、同步、语音和传输业务请求 |
-| `wetypex-syncd` | 轮询设备组并交换剪贴板内容 |
+| `wetypex-clipboard` | 轮询设备组并交换剪贴板内容 |
 | `wetypex-transfer` | 生成官方二维码、发布临时 CA 与连接角色，并驱动原版 Flurry LAN/WXP2P 文件通道 |
 | `wetypex-settings` | IBus 专用 GTK4 + libadwaita 设置窗口，管理输入、常用语和跨设备同步 |
 | `wetypex-ai` | 调用原版 AI 服务并打开问答窗口 |
@@ -53,7 +53,7 @@ WeTypeX 将原版桌面输入核心接入 IBus，同时让 Linux 桌面负责输
 - `0x2`：常用语同步。
 - `0x4`：个人词库同步。
 
-文字剪贴板使用原版文本消息；PNG 图片使用 `TypeImageOri` 和二进制字段。Wayland 优先使用 `wl-copy` / `wl-paste`，X11 使用 Qt 剪贴板。同步守护进程仅在设备组剪贴板功能位 `0x1` 开启时访问本地剪贴板；启用时先建立本地基线。它是唯一的系统剪贴板写入与上传端，并像原版 Windows/macOS 客户端一样维护设备组内的单调版本游标。远端消息只有在版本更新、来源不是本机且尚未过期时才写入；本机上传成功后立即前移同一个版本游标，从而避免旧内容回传和多写入者竞态。
+文字剪贴板使用原版文本消息；图片使用 `TypeImageOri` 和二进制字段。本地剪贴板由 GNOME Shell 扩展 `wetypex-clip-watcher@caidy.cc` 读取，`wetypex-clipboard` 通过 D-Bus 接收 `Changed` 后取回内容，并只在设备组剪贴板功能位 `0x1` 开启时上传；启用时以启动时的空选区建立本地基线，因此先于本机复制的远端内容也能收到。它是唯一的系统剪贴板写入与上传端，远端文字与图片分别通过扩展的 `SetText` / `SetImage` 写回，并像原版 Windows/macOS 客户端一样维护设备组内的单调版本游标。远端消息只有在版本更新、来源不是本机且尚未过期时才写入；本机上传成功后立即前移同一个版本游标，从而避免旧内容回传和多写入者竞态。
 
 ## 语音与 AI
 
