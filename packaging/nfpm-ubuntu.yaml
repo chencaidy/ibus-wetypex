@@ -10,6 +10,8 @@ description: WeTypeX native Linux input method for IBus
 vendor: WeTypeX contributors
 homepage: https://github.com/chencaidy/ibus-wetypex
 license: MIT AND curl AND ISC AND BSD-2-Clause AND Apache-2.0
+scripts:
+  postinstall: "@WETYPEX_PROJECT_ROOT@/packaging/post-install.sh"
 contents:
   - src: "@WETYPEX_STAGE@/"
     dst: /
@@ -17,33 +19,22 @@ contents:
 overrides:
   deb:
     depends:
-      - libc6 (>= 2.35)
-      - libstdc++6 (>= 11)
-      - libc++1
-      - llvm-libunwind1 | libunwind-x.y
-      - libssl3 | libssl3t64
-      - ca-certificates
-      - libjson-c5
-      - ibus
-      - libibus-1.0-5
-      - libglib2.0-0t64
-      - libgtk-4-1
-      - libadwaita-1-0
-      - libqt6widgets6
-      - libqt6network6
-      - libqt6dbus6
-      - libqt6svg6
-      - libqt6webenginewidgets6
       - bubblewrap
-      - util-linux
+      - ca-certificates
+      - ffmpeg
+      - fontconfig
+      - ibus
+      - libadwaita-1-0
+      - libc++1
+      - libc6 (>= 2.35)
+      - libgtk-4-1
+      - libjson-c5
+      - libnotify-bin
+      - libssl3 | libssl3t64
+      - libstdc++6 (>= 11)
+      - pipewire-bin | pipewire
+      - pkexec | policykit-1
       - python3
       - python3-fonttools
       - python3-pil
-      - fontconfig
-      - libfontconfig1
-      - libwayland-client0
-      - pipewire-bin | pipewire
-      - ffmpeg
-      - wl-clipboard
-      - libnotify-bin
-      - pkexec | policykit-1
+      - util-linux

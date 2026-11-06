@@ -46,7 +46,7 @@ build() {
     cmake -S "${srcdir}/${pkgname}-${pkgver}" -B "${srcdir}/build" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_INSTALL_LIBDIR=lib -DWETYPE_LAYER_SHELL=ON \
+        -DCMAKE_INSTALL_LIBDIR=lib \
         -DFETCHCONTENT_SOURCE_DIR_KQUEUE="${srcdir}/libkqueue" \
         -DFETCHCONTENT_SOURCE_DIR_WETYPEX_CURL="${srcdir}/curl-8.22.0"
     cmake --build "${srcdir}/build" --parallel
