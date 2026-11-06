@@ -50,7 +50,7 @@ jobs:
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
           sudo install "$(go env GOPATH)/bin/nfpm" /usr/local/bin/nfpm
 
-      - name: 构建 Ubuntu 26.04 IBus 软件包
+      - name: 构建 Ubuntu 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
         run: bash packaging/build-ubuntu-package.sh
@@ -66,8 +66,8 @@ jobs:
             -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
             archlinux:base-devel bash -euc '
               pacman -Syu --noconfirm git cmake clang boost ibus libadwaita libc++ \
-                json-c curl bubblewrap util-linux python python-fonttools python-pillow fontconfig qt6-base qt6-svg \
-                qt6-webengine layer-shell-qt pipewire ffmpeg wl-clipboard libnotify polkit
+                json-c curl bubblewrap util-linux python python-fonttools python-pillow fontconfig \
+                pipewire ffmpeg wl-clipboard libnotify polkit
               useradd -m builder
               cp -a /src/dist/arch /tmp/arch
               chown -R builder:builder /tmp/arch
@@ -83,7 +83,7 @@ jobs:
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
-            done < <(find arch ubuntu26 . -maxdepth 1 -type f \
+            done < <(find arch ubuntu22 ubuntu24 ubuntu26 . -maxdepth 1 -type f \
               \( -name 'ibus-wetypex-*.tar.gz' -o \
                  -name 'ibus-wetypex-*.pkg.tar.zst' -o \
                  -name 'ibus-wetypex_*.deb' \) \
@@ -97,6 +97,8 @@ jobs:
           path: |
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/ubuntu22/ibus-wetypex_*.deb
+            dist/ubuntu24/ibus-wetypex_*.deb
             dist/ubuntu26/ibus-wetypex_*.deb
             dist/SHA256SUMS
 
@@ -108,6 +110,8 @@ jobs:
           files=(
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
+            dist/ubuntu22/ibus-wetypex_*.deb
+            dist/ubuntu24/ibus-wetypex_*.deb
             dist/ubuntu26/ibus-wetypex_*.deb
             dist/SHA256SUMS
           )

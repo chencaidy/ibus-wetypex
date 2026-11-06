@@ -13,8 +13,8 @@ jobs:
       - name: 安装构建依赖
         run: >-
           pacman -Syu --noconfirm git cmake clang boost ibus gtk4 libadwaita libc++
-          json-c curl openssl bubblewrap util-linux python python-fonttools python-pillow fontconfig qt6-base qt6-svg
-          qt6-webengine layer-shell-qt pipewire ffmpeg wl-clipboard libnotify polkit
+          json-c curl openssl bubblewrap util-linux python python-fonttools python-pillow fontconfig
+          pipewire ffmpeg wl-clipboard libnotify polkit
       - uses: actions/checkout@v7
       - name: 配置
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
@@ -28,7 +28,7 @@ jobs:
           done
           python3 -m py_compile scripts/setup_runtime.py scripts/wechat_emoticons.py scripts/voice_stream.py tools/*.py \
             build/wetypex-update build/wetypex-sync
-      - name: 构建 Arch 软件包（启用 LTO）
+      - name: 构建 Arch 软件包 (启用 LTO)
         run: |
           python3 tools/package_release.py
           useradd -m builder
@@ -49,7 +49,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  ubuntu-2604:
+  ubuntu-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -57,17 +57,17 @@ jobs:
         with:
           go-version: stable
           cache: false
-      - name: 安装 IBus 包构建与 XML 校验工具
+      - name: 安装 DEB 包构建与 XML 校验工具
         run: |
           sudo apt-get update
           sudo apt-get install -y libxml2-utils
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
           sudo install "$(go env GOPATH)/bin/nfpm" /usr/local/bin/nfpm
-      - name: 在 Ubuntu 26.04 构建 IBus 软件包
+      - name: 构建 Ubuntu 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
         run: bash packaging/build-ubuntu-package.sh
-      - name: 验证 IBus 包元数据与前端依赖
+      - name: 验证 DEB 包元数据与前端依赖
         shell: bash
         run: |
           package=$(find dist/ubuntu26 -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
@@ -85,26 +85,35 @@ jobs:
           dpkg-deb --contents "$package"
       - uses: actions/upload-artifact@v7
         with:
-          name: ibus-wetypex-ubuntu-26.04
-          path: dist/ubuntu26/ibus-wetypex_*.deb
+          name: ibus-wetypex-ubuntu
+          path: |
+            dist/ubuntu22/ibus-wetypex_*.deb
+            dist/ubuntu24/ibus-wetypex_*.deb
+            dist/ubuntu26/ibus-wetypex_*.deb
           if-no-files-found: error
           retention-days: 30
 
-  deb-runtime:
-    needs: ubuntu-2604
+  ubuntu-runtime:
+    needs: ubuntu-build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        image: ["ubuntu:26.04"]
+        include:
+          - image: ubuntu:22.04
+            package_dir: ubuntu22
+          - image: ubuntu:24.04
+            package_dir: ubuntu24
+          - image: ubuntu:26.04
+            package_dir: ubuntu26
     container: ${{ matrix.image }}
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: ibus-wetypex-ubuntu-26.04
+          name: ibus-wetypex-ubuntu
           path: packages
       - name: 安装软件包并启动网络诊断
         run: |
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/${{ matrix.package_dir }}/*.deb
           wetypex-account network-info
