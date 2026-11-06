@@ -1,29 +1,102 @@
 #!/bin/sh
 set -eu
 
-command -v update-desktop-database >/dev/null 2>&1 && \
-  update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
-command -v gtk-update-icon-cache >/dev/null 2>&1 && \
-  gtk-update-icon-cache -q -t /usr/share/icons/hicolor >/dev/null 2>&1 || true
+if [ -r /etc/os-release ]; then
+  . /etc/os-release
+fi
 
+# Import apparmor policy
+ubuntu_version=${VERSION_ID:-0}
+ubuntu_major=${ubuntu_version%%.*}
+
+if [ "${ID:-}" = ubuntu ] && [ "$ubuntu_major" -gt 23 ] && [ ! -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+cat <<'EOF' > /etc/apparmor.d/bwrap-userns-restrict
+# This profile allows almost everything and only exists to allow
+# bwrap to work on a system with user namespace restrictions
+# being enforced.
+# bwrap is allowed access to user namespaces and capabilities
+# within the user namespace, but its children do not have
+# capabilities, blocking bwrap from being able to be used to
+# arbitrarily by-pass the user namespace restrictions.
+#
+# Note: the bwrap child is stacked against the bwrap profile due to
+# bwraps use of no-new-privs
+
+# disabled by default as it can break some use cases on a system that
+# doesn't have or has disable user namespace restrictions for unconfined
+# use aa-enforce to enable it
+
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(attach_disconnected) {
+  allow capability,
+  # not allow all, to allow for pix stack
+  # sadly we have to allow  m every where to allow children to work under
+  # stacking.
+  allow file rwlkm /{**,},
+  allow network,
+  allow unix,
+  allow ptrace,
+  allow signal,
+  allow mqueue,
+  allow io_uring,
+  allow userns,
+  allow mount,
+  allow umount,
+  allow pivot_root,
+  allow dbus,
+  allow px /** -> bwrap//&unpriv_bwrap,
+
+  # the local include should not be used without understanding the userns
+  # restriction.
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/bwrap-userns-restrict>
+}
+
+profile unpriv_bwrap flags=(attach_disconnected) {
+  # not allow all, to allow for pix stack
+  allow file rwlkm /{**,},
+  allow network,
+  allow unix,
+  allow ptrace,
+  allow signal,
+  allow mqueue,
+  allow io_uring,
+  allow userns,
+  allow mount,
+  allow umount,
+  allow pivot_root,
+  allow dbus,
+
+  allow pix /** -> &unpriv_bwrap,
+
+  audit deny capability,
+
+  # the local include should not be used without understanding the userns
+  # restriction.
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/unpriv_bwrap>
+}
+EOF
+apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+fi
+
+# Show usage
 cat <<'EOF'
+WeTypeX已安装, 请完成下述配置:
 
-WeTypeX 已安装。首次使用请依次执行：
-
-  1. 准备官方运行时（二选一）：
+  1. 准备官方运行时:
      wetypex-setup --download --accept-upstream-license
-     wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
-
-  2. 检查输入核心：
      wetypex-setup --check
 
-  3. 打开「设置 → 键盘」，将 WeTypeX 添加到当前输入法列表。
+  2. 登出或重启系统, 使系统重新发现输入法和扩展.
 
-  4. 启用跨设备剪贴板扩展（安装后需重新登录一次，Shell 才能发现它）：
+  3. 打开[设置-键盘], 将WeTypeX添加到输入法列表.
+
+  4. 启用跨设备剪贴板扩展:
      gnome-extensions enable wetypex-clip-watcher@caidy.cc
-
-  5. 重启 IBus：
-     ibus restart
-
-完整说明：https://github.com/chencaidy/ibus-wetypex#首次设置
+   
+完整说明: https://github.com/chencaidy/ibus-wetypex
 EOF

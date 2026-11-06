@@ -3,7 +3,6 @@
 FetchContent_Declare(wetypex_openssl
   URL https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz
   URL_HASH SHA256=b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(wetypex_openssl)
 if(NOT wetypex_openssl_POPULATED)

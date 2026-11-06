@@ -5,6 +5,10 @@ file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in"
   WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
 string(REGEX REPLACE "^pkgrel=" "" WETYPE_PACKAGE_RELEASE "${WETYPE_PACKAGE_RELEASE_LINE}")
 
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
 endif()
@@ -99,7 +103,6 @@ set(ENABLE_TESTING OFF CACHE BOOL "libkqueue tests" FORCE)
 FetchContent_Declare(kqueue
   GIT_REPOSITORY https://github.com/mheily/libkqueue.git
   GIT_TAG 46a3e130f88b0b0742575dcb01d77e336538024b
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(kqueue)
 if(NOT kqueue_POPULATED)

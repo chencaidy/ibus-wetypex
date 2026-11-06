@@ -3,7 +3,6 @@ set(WETYPE_CURL_VERSION "8.22.0")
 FetchContent_Declare(wetypex_curl
   URL "https://curl.se/download/curl-${WETYPE_CURL_VERSION}.tar.xz"
   URL_HASH SHA256=f7ef3ae8a22e521f289803fe93543eb64c329b58aa73a9e224dfd915a2a5f4f7
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_GetProperties(wetypex_curl)
 if(NOT wetypex_curl_POPULATED)
