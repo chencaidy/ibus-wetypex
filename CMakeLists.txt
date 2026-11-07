@@ -205,7 +205,6 @@ install(PROGRAMS scripts/voice_stream.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${
 install(DIRECTORY src/clipboard/wetypex-clip-watcher@caidy.cc DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions)
 install(DIRECTORY data/icons/hicolor/ DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor)
 
-install(FILES data/hyprland.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
 install(FILES data/wetypex-symbols.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})

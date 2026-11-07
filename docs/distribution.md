@@ -19,15 +19,15 @@ packaging/build-packages.sh
 
 脚本通过统一的 `/usr` staging 目录生成便携 `tar.zst`，在 Ubuntu 26.04 容器中编译标准 deb，最后调用 makepkg 生成 Arch 软件包。系统需要预先安装 Docker、`nfpm`、`makepkg`、zstd 和本机构建依赖。
 
-标准 deb 使用 Ubuntu 26.04 的 Qt6、IBus 和 glibc 构建。
+标准 deb 使用当前发行版的 gtk4、ibus 和 glibc 构建。
 
 运行时启动也兼容 Focal 的 Bubblewrap 0.4：在启动沙箱前清空环境，再显式传入所需变量，覆盖核心、账号、AI、语音和首次校验流程。旧版 `notify-send` 没有操作按钮时使用普通更新通知。排查旧系统时应实际运行 `wetypex-setup --check` 和输入、语音流程，编译成功不能证明这些辅助命令可用。
 
-私有引擎宿主继续位于 `/usr/lib/ibus-wetypex`。配置工具会在 `qt5` 或 `qt6` 子目录加载对应 ABI 的插件。Qt6 不完整时，源码构建会使用 Qt5.12+，可通过 `WETYPE_QT_VERSION` 指定。
+私有引擎宿主继续位于 `/usr/lib/ibus-wetypex`。配置工具会在其子目录加载对应 ABI 的插件。
 
 网络桥接默认静态包含固定版本 libcurl，启用 WS/WSS、OpenSSL 和线程 DNS 解析，避免发行版关闭 WebSocket 功能导致运行时失败。curl 源码版本与 SHA-256 固定在 `cmake/BundledCurl.cmake` 和 Arch 构建文件中，更新时应同步维护。可用 `-DWETYPE_BUNDLED_CURL=OFF` 选择系统 libcurl 8.9+，还需确认其构建启用了 WS/WSS。
 
-系统 OpenSSL 低于 3 时，构建私有静态 OpenSSL 3.5.5；其源代码与 SHA-256 固定在 `cmake/BundledOpenSSL.cmake`，许可证随包安装。CMake 3.16/3.17 使用 curl 发布源码中的 configure 构建，仍保持 WS/WSS、证书校验和 LTO 隔离。Fedora 40 构建使用签名校验开启的官方归档仓库。
+系统 OpenSSL 低于 3 时，构建私有静态 OpenSSL 3.5.5；其源代码与 SHA-256 固定在 `cmake/BundledOpenSSL.cmake`，许可证随包安装。CMake 3.22 使用 curl 发布源码中的 configure 构建，仍保持 WS/WSS、证书校验和 LTO 隔离。Fedora 40 构建使用签名校验开启的官方归档仓库。
 
 ## 独立包
 
@@ -82,4 +82,4 @@ makepkg -C -f --noconfirm
 
 ## GitHub Release
 
-推送由 `CMakeLists.txt` 版本和软件包修订号组成的 `vX.Y.Z.B-N` 标签会触发发布工作流。工作流分别在 Arch Linux、Ubuntu 26.04 环境构建软件包，生成源码包、便携归档与 SHA-256 校验文件，并创建或更新同名 GitHub Release。标签与源码版本或修订号不一致时，工作流会直接失败。
+推送由 `CMakeLists.txt` 版本和软件包修订号组成的 `vX.Y.Z.B-N` 标签会触发发布工作流。工作流分别在 Arch Linux、Ubuntu 环境构建软件包，生成源码包、便携归档与 SHA-256 校验文件，并创建或更新同名 GitHub Release。标签与源码版本或修订号不一致时，工作流会直接失败。

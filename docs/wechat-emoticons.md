@@ -12,15 +12,15 @@ wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
 
 安装器沿用原版压缩包 SHA-256 校验，将 PNG 提取到 `$XDG_DATA_HOME/wetypex/ui/wechat-emoticons/`，并在 `$XDG_DATA_HOME/fonts/wetypex-wechat.ttf` 生成彩色字体。未设置 XDG 变量时使用 `~/.local/share`。生成需要 fontTools、Pillow 和 fontconfig，发行包已声明这些依赖。源码环境缺少 fontTools 或 Pillow 时，安装器给出提示，候选仍显示文本名称。
 
-Fcitx 的候选文本接口没有图片字段。因此本地字体仅把内部私用码位 `U+10F000–U+10F0FF` 映射到原图，让现有 Classic UI 或支持相同字体的候选界面绘制图片，无需另开抢焦点的窗口。私用字符只用于候选显示，提交使用引擎候选 ID 和文本。图片旁保留名称；字体未就绪时显示名称，不使用相近的 Unicode emoji 代替。
+IBus 的候选文本接口没有图片字段。因此本地字体仅把内部私用码位 `U+10F000–U+10F0FF` 映射到原图，让现有 Classic UI 或支持相同字体的候选界面绘制图片，无需另开抢焦点的窗口。私用字符只用于候选显示，提交使用引擎候选 ID 和文本。图片旁保留名称；字体未就绪时显示名称，不使用相近的 Unicode emoji 代替。
 
-安装后重启 Fcitx5，让候选界面加载新字体。若使用独立的桌面候选面板且仍未加载新字体，也需要重新启动该面板。
+安装后重启 IBus，让候选界面加载新字体。若使用独立的桌面候选面板且仍未加载新字体，也需要重新启动该面板。
 
 原图和派生字体只保存在用户数据中，不进入源码包、发行包或仓库。仓库中的 `data/wechat-emoticons.json` 只保存别名、图片文件名和显示码位等功能映射。
 
 ## 微信应用范围
 
-插件使用 Fcitx 输入上下文提供的程序标识，精确识别 `wechat`、`weixin`、`xwechat`、`com.tencent.WeChat` 和 `com.tencent.Weixin`，忽略大小写和 `.desktop` 后缀。WeChatAppEx 浏览器、网页微信、其他应用和无法识别的上下文均不启用微信表情。普通 Unicode emoji、颜文字等原有开关保持独立。
+插件使用 IBus 输入上下文提供的程序标识，精确识别 `wechat`、`weixin`、`xwechat`、`com.tencent.WeChat` 和 `com.tencent.Weixin`，忽略大小写和 `.desktop` 后缀。WeChatAppEx 浏览器、网页微信、其他应用和无法识别的上下文均不启用微信表情。普通 Unicode emoji、颜文字等原有开关保持独立。
 
 部分原生 Wayland 输入协议只暴露共享上下文，不提供程序身份。这种情况下关闭微信专属候选，不根据窗口标题或“上一个窗口”推测应用。通过客户端输入法接口提供应用身份的微信会话可正常识别。密码输入仍沿用输入法的禁用规则。
 

@@ -1,72 +1,74 @@
 # 故障排查
 
-## 输入法安装后没有出现在列表中
+## 输入法安装后没有出现在 IBus 列表中
 
-尝试重启系统：
+先重启 IBus：
 
 ```bash
-reboot
+ibus restart
 ```
 
-## 提示核心不可用
+若仍未出现，请注销并重新登录，再确认已在桌面输入法设置中启用 WeTypeX。
+
+## IBus 属性面板显示 X 或“核心不可用”
+
+运行检查：
 
 ```bash
 wetypex-setup --check
 ```
 
-输出中的 `core_ready` 应为 `true`。若报告文件缺失或核心验证失败，重新准备固定版本：
+查看 `runtime_installed`、`ui_installed` 和 `core_ready`。若运行时文件缺失或核心验证失败，可用已取得的官方归档重新准备运行时：
 
 ```bash
 wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
 ```
 
-散列不匹配时不要绕过校验。下载或版本变化可能意味着 ABI 不兼容。
+不要绕过散列校验；散列不匹配可能表示归档版本或 ABI 不兼容。也可在 IBus 属性面板中选择“重启核心”后重试。
 
-## 界面正常，但中文没有候选或无法上屏
+## 中文输入没有候选或无法上屏
 
-运行 `wetypex-account network-info`，检查 `json_c_version` 和 `utf8_json`。后者应为 `true`。json-c 0.18 的严格模式存在将中文 UTF-8 字节误判为控制字符的问题，WeTypeX 在解析前做兼容转换并保留严格语法、UTF-8 和尾随数据校验。升级到包含该修复的构建即可使用系统原有 json-c；`wetypex-setup --check` 也会检查该兼容链路。
+确认 IBus 属性面板当前显示“中文”，并检查是否在密码或 PIN 输入框中；这类输入框会停用输入核心。然后运行 `wetypex-setup --check`。若 `core_ready` 为 `false`，按上节处理；若 `core_ready` 为 `true` 但问题仍在，先从输入法属性面板重启核心，再复现问题。
+
+如 `wetypex-setup --check` 报告 `UTF-8 JSON compatibility check failed`，请升级到包含兼容修复的 WeTypeX 构建。此修复用于兼容 json-c 0.18 严格模式对中文 UTF-8 的解析问题；检查通过后无需替换系统 json-c。
 
 ## 本地候选正常，但没有云候选
 
-先运行 `wetypex-account network-info`。默认构建应显示 `provider: bundled-static`、`ws: true`、`wss: true`；输出不需要读取配对身份，也不会联网。Ubuntu 24.04 的系统 libcurl 8.5 关闭了 WebSocket，修复版桥接使用自己的 libcurl。连接采用 Happy Eyeballs，并在网络/TLS 建连失败时于同一超时预算内尝试 IPv4；无需修改 `/etc/hosts` 固定上游 IP。
+运行 `wetypex-account network-info` 检查网络桥接能力。默认构建应显示 `provider: bundled-static`、`ws: true`、`wss: true` 和 `utf8_json: true`。该命令只检查本地运行库，不读取配对身份，也不会联网。
 
-1. 在设置中确认“单机模式”关闭。
-2. 运行 `wetypex-account group-info`。
-3. 检查 `~/.local/share/wetypex/account/identity.json` 是否存在。
-4. 查看 `account/last-network.log` 中最后一次业务初始化结果，分享日志前删除账户标识。
+1. 在设置中确认“单机模式”已关闭。
+2. 确认 `~/.local/share/wetypex/account/identity.json` 存在。若使用了自定义 `XDG_DATA_HOME`，请检查对应目录下的 `wetypex/account/identity.json`。
+3. 运行 `wetypex-account group-info` 检查设备组状态。
+4. 若账户请求失败，查看 `~/.local/share/wetypex/account/last-network.log`。分享日志前请移除账户标识等个人信息。
 
-## 个人词库与常用语同步
+## 个人词库或常用语没有同步
 
-先用 `wetypex-account group-info` 确认设备已关联，功能位 `4` 表示个人词库、`2` 表示常用语。启用 WeTypeX 并关闭单机模式后，可在完整设置中点击“立即请求同步”，或运行 `wetypex-account sync-now`。命令读取最新设备组并把请求交给当前原版输入核心；`requested: true` 表示核心接受了请求，下载与跨设备完成情况还需通过关联设备确认。
+运行 `wetypex-account group-info` 确认设备已关联；`func_switch` 的位 `4` 表示个人词库同步，位 `2` 表示常用语同步。在设置中开启对应功能，并关闭“单机模式”。WeTypeX 输入法须处于启用状态，然后可点击设置中的“立即请求同步”，或运行：
 
-`state/sync-runtime.json` 的 `remote_version`、`local_kind` 和 `local_digest` 仅描述剪贴板，不是个人词库下载状态。核心的 `state/user/persistent_data`、`state/user/network` 与 `state/userDict` 在重启时保留；不要为排查普通连接故障删除这些目录。源码修复前的启动脚本曾自动删除前两个缓存目录。
+```bash
+wetypex-account sync-now
+```
+
+命令返回 `requested: true` 表示输入核心已接受同步请求，不代表远端下载已完成。`~/.local/share/wetypex/state/sync-runtime.json` 中的 `remote_version`、`local_kind` 和 `local_digest` 是剪贴板同步状态，不是个人词库下载状态。排查时不要删除核心的用户数据目录。
 
 ## 跨设备剪贴板没有同步
 
-确认设备组的 `func_switch` 包含剪贴板位 `1`，并确认 GNOME Shell 扩展 `wetypex-clip-watcher@caidy.cc` 已安装且启用：本地剪贴板只能通过它读写。安装后需重新登录一次，然后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc`；用 `gnome-extensions list --enabled` 可确认状态。使用 `WETYPE_CLIPBOARD_DEBUG=1` 手动运行 `wetypex-clipboard` 可看到双向传输日志。同步守护进程使用文件锁，避免手工同时运行多个实例。
-
-## 隔空传送无法连接
-
-先运行：
+确认关联设备组的 `func_switch` 包含剪贴板功能位 `1`，并确认 GNOME Shell 扩展 `wetypex-clip-watcher@caidy.cc` 已安装且启用：
 
 ```bash
-wetypex-setup --check
+gnome-extensions list --enabled
 ```
 
-检查结果应同时包含 `flurry` 与 `wxp2p`，并且 `core_ready` 为 `true`。原版 WXP2P 会依次尝试局域网直连、公网打洞和腾讯中继，因此两台设备不必位于同一局域网。受限网络需要允许出站 UDP，以及到上游中继的 TCP 80、8080 和 16285 端口。
-
-传输日志位于 `~/.local/share/wetypex/state/transfer/transport.log`。手机点击重试时桌面窗口无需关闭；WeTypeX 会继续轮询同一传输码，并在官方服务返回新调度数据后重建会话。若只缺少传输图标或连接示意图，可从同一官方安装包重新提取：
+若扩展未启用，可执行：
 
 ```bash
-wetypex-setup --archive /path/to/WeType_2.2.3_657.zip --icons-only
+gnome-extensions enable wetypex-clip-watcher@caidy.cc
 ```
 
-## 重新配对
+GNOME Shell 扩展负责读取本地剪贴板并写入收到的内容；启用扩展后若仍无效，请注销并重新登录。不要同时手动启动多个 `wetypex-clipboard` 实例。
 
-普通故障不要删除身份文件。确需重置时先备份：
+## 关联设备失败或需要重新关联
 
-```bash
-cp -a ~/.local/share/wetypex/account ~/wetypex-account-backup
-```
+在 WeTypeX 设置的“跨设备”页选择“获取匹配码”。匹配码有效期为 5 分钟；在另一台设备的“微信输入法设置 → 跨设备粘贴同步 → 关联设备”中输入该码，并按提示完成确认。
 
-再关闭 IBus 与 WeTypeX 相关进程，移走 `account` 和 `state/sync-state.json`，重新打开设置窗口获取匹配码。
+若无法获取匹配码，先确认“单机模式”已关闭，再运行 `wetypex-account network-info` 和 `wetypex-account group-info` 检查本地运行库与账户状态。普通重试不需要删除 `account` 或 `state` 目录；若账户请求失败，检查 `~/.local/share/wetypex/account/last-network.log`，分享前移除其中的账户标识。
