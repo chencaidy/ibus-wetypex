@@ -1314,7 +1314,7 @@ int main(int argc, char **argv) {
   g_set_prgname("wetypex-settings");
   g_set_application_name(kAppName);
 
-  GApplication *application = g_application_new("io.github.panxuc.WetypeSettings", G_APPLICATION_HANDLES_COMMAND_LINE);
+  GApplication *application = g_application_new("org.freedesktop.IBus.Wetypex.Setup", G_APPLICATION_HANDLES_COMMAND_LINE);
   app.application = application;
   g_signal_connect(application, "startup", G_CALLBACK(on_startup), nullptr);
   g_signal_connect(application, "activate", G_CALLBACK(on_activate), nullptr);

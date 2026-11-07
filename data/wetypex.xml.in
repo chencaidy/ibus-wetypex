@@ -19,6 +19,7 @@
       <icon>@CMAKE_INSTALL_FULL_DATADIR@/icons/hicolor/48x48/apps/wetypex.png</icon>
       <layout>default</layout>
       <rank>90</rank>
+      <setup>/usr/bin/wetypex-settings</setup>
     </engine>
   </engines>
 </component>
