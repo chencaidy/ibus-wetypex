@@ -124,56 +124,56 @@ jobs:
               --title "WeTypeX ${RELEASE_TAG#v}" --generate-notes
           fi
 
-  aur:
-    needs: release
-    if: ${{ always() && (inputs.only_aur || needs.release.result == 'success') }}
-    runs-on: ubuntu-latest
-    container: archlinux:base-devel
-    env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.tag || github.ref_name }}
-      - name: 安装 AUR 发布工具
-        run: pacman -Syu --noconfirm curl git openssh
-      - name: 发布 AUR 元数据
-        env:
-          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        run: |
-          test -n "$AUR_SSH_PRIVATE_KEY"
-          useradd --create-home builder
-          install -d -o builder -g builder -m0700 /home/builder/.ssh
-          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /home/builder/.ssh/aur
-          ssh-keyscan -H aur.archlinux.org > /home/builder/.ssh/known_hosts
-          chown builder:builder /home/builder/.ssh/aur /home/builder/.ssh/known_hosts
-          chmod 0600 /home/builder/.ssh/aur /home/builder/.ssh/known_hosts
-          git_ssh='ssh -i /home/builder/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/builder/.ssh/known_hosts'
-          runuser -u builder -- env \
-            HOME=/home/builder \
-            GIT_SSH_COMMAND="$git_ssh" \
-            RELEASE_TAG="$RELEASE_TAG" \
-            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
-            bash -lc '
-              git clone ssh://aur@aur.archlinux.org/ibus-wetypex.git "$HOME/aur"
-              cp "$1/packaging/aur/PKGBUILD" \
-                 "$1/packaging/aur/ibus-wetypex.install" "$HOME/aur/"
-              cd "$HOME/aur"
-              version=$(sed -n "s/^project([^ ]* VERSION \([^ ]*\).*/\1/p" "$1/CMakeLists.txt")
-              pkgrel=$(sed -n "s/^pkgrel=//p" "$1/packaging/PKGBUILD.in")
-              sed -i "s/^pkgver=.*/pkgver=$version/" PKGBUILD
-              sed -i "s/^pkgrel=.*/pkgrel=$pkgrel/" PKGBUILD
-              source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/ibus-wetypex-${version}.tar.gz"
-              digest="$(curl -fsSL "$source_url" | sha256sum | cut -d" " -f1)"
-              sed -i "s/^sha256sums=(\"SKIP\" /sha256sums=(\"$digest\" /" PKGBUILD
-              makepkg --printsrcinfo > .SRCINFO
-              git config user.name wetypex-release-bot
-              git config user.email actions@users.noreply.github.com
-              git add PKGBUILD ibus-wetypex.install .SRCINFO
-              if git diff --cached --quiet; then
-                echo "AUR metadata is already current"
-                exit 0
-              fi
-              git commit -m "ibus-wetypex $version-$pkgrel"
-              git push
-            ' _ "$GITHUB_WORKSPACE"
+  # aur:
+  #   needs: release
+  #   if: ${{ always() && (inputs.only_aur || needs.release.result == 'success') }}
+  #   runs-on: ubuntu-latest
+  #   container: archlinux:base-devel
+  #   env:
+  #     RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         ref: ${{ inputs.tag || github.ref_name }}
+  #     - name: 安装 AUR 发布工具
+  #       run: pacman -Syu --noconfirm curl git openssh
+  #     - name: 发布 AUR 元数据
+  #       env:
+  #         AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+  #       run: |
+  #         test -n "$AUR_SSH_PRIVATE_KEY"
+  #         useradd --create-home builder
+  #         install -d -o builder -g builder -m0700 /home/builder/.ssh
+  #         printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /home/builder/.ssh/aur
+  #         ssh-keyscan -H aur.archlinux.org > /home/builder/.ssh/known_hosts
+  #         chown builder:builder /home/builder/.ssh/aur /home/builder/.ssh/known_hosts
+  #         chmod 0600 /home/builder/.ssh/aur /home/builder/.ssh/known_hosts
+  #         git_ssh='ssh -i /home/builder/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/builder/.ssh/known_hosts'
+  #         runuser -u builder -- env \
+  #           HOME=/home/builder \
+  #           GIT_SSH_COMMAND="$git_ssh" \
+  #           RELEASE_TAG="$RELEASE_TAG" \
+  #           GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+  #           bash -lc '
+  #             git clone ssh://aur@aur.archlinux.org/ibus-wetypex.git "$HOME/aur"
+  #             cp "$1/packaging/aur/PKGBUILD" \
+  #                "$1/packaging/aur/ibus-wetypex.install" "$HOME/aur/"
+  #             cd "$HOME/aur"
+  #             version=$(sed -n "s/^project([^ ]* VERSION \([^ ]*\).*/\1/p" "$1/CMakeLists.txt")
+  #             pkgrel=$(sed -n "s/^pkgrel=//p" "$1/packaging/PKGBUILD.in")
+  #             sed -i "s/^pkgver=.*/pkgver=$version/" PKGBUILD
+  #             sed -i "s/^pkgrel=.*/pkgrel=$pkgrel/" PKGBUILD
+  #             source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/ibus-wetypex-${version}.tar.gz"
+  #             digest="$(curl -fsSL "$source_url" | sha256sum | cut -d" " -f1)"
+  #             sed -i "s/^sha256sums=(\"SKIP\" /sha256sums=(\"$digest\" /" PKGBUILD
+  #             makepkg --printsrcinfo > .SRCINFO
+  #             git config user.name wetypex-release-bot
+  #             git config user.email actions@users.noreply.github.com
+  #             git add PKGBUILD ibus-wetypex.install .SRCINFO
+  #             if git diff --cached --quiet; then
+  #               echo "AUR metadata is already current"
+  #               exit 0
+  #             fi
+  #             git commit -m "ibus-wetypex $version-$pkgrel"
+  #             git push
+  #           ' _ "$GITHUB_WORKSPACE"
