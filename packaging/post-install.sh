@@ -9,8 +9,7 @@ fi
 ubuntu_version=${VERSION_ID:-0}
 ubuntu_major=${ubuntu_version%%.*}
 
-if [ "${ID:-}" = ubuntu ] && [ "$ubuntu_major" -gt 23 ] && [ ! -f /etc/apparmor.d/bwrap-userns-restrict ]; then
-mkdir -p /etc/apparmor.d
+if [ "${ID:-}" = ubuntu ] && [ "$ubuntu_major" -gt 23 ] && [ -d /etc/apparmor.d ] && [ ! -f /etc/apparmor.d/bwrap-userns-restrict ]; then
 cat <<'EOF' > /etc/apparmor.d/bwrap-userns-restrict
 # This profile allows almost everything and only exists to allow
 # bwrap to work on a system with user namespace restrictions
