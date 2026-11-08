@@ -23,8 +23,7 @@ for script in scripts/*.sh.in; do
   case "$script" in *-update.sh.in|*-sync.sh.in) continue;; esac
   sh -n "$script"
 done
-python3 -m py_compile scripts/setup_runtime.py tools/*.py \
-  build/wetypex-update build/wetypex-sync
+python3 -m py_compile scripts/*.py tools/*.py build/wetypex-sync
 ```
 
 Pull Request 应描述最终行为、适用环境、实际执行过的检查以及仍存在的限制。

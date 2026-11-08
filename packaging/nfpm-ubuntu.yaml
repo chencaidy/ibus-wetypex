@@ -32,6 +32,7 @@ overrides:
       - libnotify-bin
       - libssl3 | libssl3t64
       - libstdc++6 (>= 11)
+      - llvm-libunwind1 | libunwind-x.y
       - pipewire-bin | pipewire
       - pkexec | policykit-1
       - python3

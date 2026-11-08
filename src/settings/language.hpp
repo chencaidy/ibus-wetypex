@@ -9,7 +9,8 @@
 namespace ibus_settings::lang {
 
 // ---- 应用信息 ----
-inline constexpr const char *kAppName = "WeTypeX 设置（IBus）";
+inline constexpr const char *kAppID = "org.freedesktop.IBus.Wetypex.Setup";
+inline constexpr const char *kAppName = "WeTypeX 设置";
 inline constexpr const char *kBrandName = "WeTypeX";
 inline constexpr const char *kDeveloperName = "WeTypeX contributors";
 inline constexpr const char *kAboutComments = "\nWeTypeX IBus 输入法设置\n原版核心及相关商标归其权利人所有";

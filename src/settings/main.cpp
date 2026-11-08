@@ -5,7 +5,7 @@
 
 #include "../common/json.hpp"
 
-#include <adwaita.h>
+#include "adwaita_backport.h"
 #include <json-c/json.h>
 
 #include <algorithm>
@@ -14,94 +14,6 @@
 #include <functional>
 #include <string>
 #include <vector>
-
-#if !ADW_CHECK_VERSION(1, 4, 0)
-#define ADW_SWITCH_ROW(obj) (obj)
-#define ADW_SPIN_ROW(obj) (obj)
-#define ADW_TOOLBAR_VIEW(obj) (obj)
-
-static inline GtkWidget *wetypex_switch_row_new() {
-  GtkWidget *row = adw_action_row_new();
-  GtkWidget *toggle = gtk_switch_new();
-  gtk_widget_set_halign(toggle, GTK_ALIGN_CENTER);
-  gtk_widget_set_valign(toggle, GTK_ALIGN_CENTER);
-  g_object_set_data(G_OBJECT(row), "wetypex-switch", toggle);
-  adw_action_row_add_suffix(ADW_ACTION_ROW(row), toggle);
-  return row;
-}
-
-static inline gboolean wetypex_switch_row_get_active(GObject *row) {
-  auto *toggle = static_cast<GtkWidget *>(g_object_get_data(row, "wetypex-switch"));
-  return toggle ? gtk_switch_get_active(GTK_SWITCH(toggle)) : FALSE;
-}
-
-static inline void wetypex_switch_row_set_active(GObject *row, gboolean active) {
-  auto *toggle = static_cast<GtkWidget *>(g_object_get_data(row, "wetypex-switch"));
-  if (toggle)
-    gtk_switch_set_active(GTK_SWITCH(toggle), active);
-}
-
-static inline GtkWidget *wetypex_spin_row_new_with_range(double minimum, double maximum, double step) {
-  GtkWidget *row = adw_action_row_new();
-  GtkWidget *spin = gtk_spin_button_new_with_range(minimum, maximum, step);
-  gtk_widget_set_halign(spin, GTK_ALIGN_END);
-  g_object_set_data(G_OBJECT(row), "wetypex-spin", spin);
-  adw_action_row_add_suffix(ADW_ACTION_ROW(row), spin);
-  return row;
-}
-
-static inline double wetypex_spin_row_get_value(GObject *row) {
-  auto *spin = static_cast<GtkWidget *>(g_object_get_data(row, "wetypex-spin"));
-  return spin ? gtk_spin_button_get_value(GTK_SPIN_BUTTON(spin)) : 0.0;
-}
-
-static inline void wetypex_spin_row_set_value(GObject *row, double value) {
-  auto *spin = static_cast<GtkWidget *>(g_object_get_data(row, "wetypex-spin"));
-  if (spin)
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), value);
-}
-
-static inline GtkWidget *wetypex_toolbar_view_new() { return gtk_box_new(GTK_ORIENTATION_VERTICAL, 0); }
-
-static inline void adw_toolbar_view_add_top_bar(GtkWidget *toolbar, GtkWidget *bar) {
-  gtk_box_append(GTK_BOX(toolbar), bar);
-}
-
-static inline void adw_toolbar_view_set_content(GtkWidget *toolbar, GtkWidget *content) {
-  auto *old_content = static_cast<GtkWidget *>(g_object_get_data(G_OBJECT(toolbar), "wetypex-content"));
-  if (old_content)
-    gtk_box_remove(GTK_BOX(toolbar), old_content);
-  if (content) {
-    g_object_set_data_full(G_OBJECT(toolbar), "wetypex-content", g_object_ref(content), g_object_unref);
-    gtk_box_append(GTK_BOX(toolbar), content);
-  }
-}
-
-static inline GtkWidget *wetypex_entry_row_new() {
-  GtkWidget *row = adw_action_row_new();
-  GtkWidget *entry = gtk_entry_new();
-  g_object_set_data(G_OBJECT(row), "wetypex-entry", entry);
-  adw_action_row_add_suffix(ADW_ACTION_ROW(row), entry);
-  return row;
-}
-
-#define adw_switch_row_new() wetypex_switch_row_new()
-#define adw_switch_row_get_active(obj) wetypex_switch_row_get_active(G_OBJECT(obj))
-#define adw_switch_row_set_active(obj, value) wetypex_switch_row_set_active(G_OBJECT(obj), value)
-#define adw_spin_row_new_with_range(minimum, maximum, step) wetypex_spin_row_new_with_range(minimum, maximum, step)
-#define adw_spin_row_get_value(obj) wetypex_spin_row_get_value(G_OBJECT(obj))
-#define adw_spin_row_set_value(obj, value) wetypex_spin_row_set_value(G_OBJECT(obj), value)
-#define adw_toolbar_view_new() wetypex_toolbar_view_new()
-#define adw_entry_row_new() wetypex_entry_row_new()
-#endif
-
-static inline GtkWidget *wetypex_entry_row_get_entry(GtkWidget *row) {
-#if ADW_CHECK_VERSION(1, 4, 0)
-  return row;
-#else
-  return static_cast<GtkWidget *>(g_object_get_data(G_OBJECT(row), "wetypex-entry"));
-#endif
-}
 
 #ifndef WETYPE_VERSION
 #define WETYPE_VERSION "unknown"
@@ -113,8 +25,9 @@ using namespace ibus_settings::lang;
 namespace {
 
 struct AppState {
-  GApplication *application = nullptr;
+  AdwApplication *application = nullptr;
   GtkWidget *window = nullptr;
+  GtkWidget *view_stack = nullptr;
   GtkWidget *standalone_switch = nullptr;
   GtkWidget *devices_page = nullptr;
   GtkWidget *sync_status_row = nullptr;
@@ -155,14 +68,6 @@ GtkWidget *dim_label(const char *text) {
   gtk_label_set_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
   gtk_widget_add_css_class(label, "dim-label");
   return label;
-}
-
-GtkWidget *make_page(const char *name, const char *title, const char *icon) {
-  GtkWidget *page = adw_preferences_page_new();
-  adw_preferences_page_set_name(ADW_PREFERENCES_PAGE(page), name);
-  adw_preferences_page_set_title(ADW_PREFERENCES_PAGE(page), title);
-  adw_preferences_page_set_icon_name(ADW_PREFERENCES_PAGE(page), icon);
-  return page;
 }
 
 GtkWidget *make_group(const char *title, const char *description = nullptr) {
@@ -695,14 +600,14 @@ gboolean pairing_poll(gpointer data) {
         if (account_ok(confirm)) {
           pairing_set_status(state, kPairingSuccess);
           refresh_devices_page();
-          g_timeout_add(
-              900,
+          g_timeout_add_full(
+              G_PRIORITY_DEFAULT, 900,
               [](gpointer window) {
                 if (GTK_IS_WINDOW(window))
                   gtk_window_destroy(GTK_WINDOW(window));
                 return G_SOURCE_REMOVE;
               },
-              state->window);
+              g_object_ref(state->window), g_object_unref);
         } else {
           state->confirmed = false;
           pairing_set_status(state, kPairingFailed);
@@ -998,7 +903,7 @@ void refresh_devices_page() {
 
 GtkWidget *build_input_page() {
   auto settings = read_settings();
-  GtkWidget *page = make_page("input", kPageInputTitle, "input-keyboard-symbolic");
+  GtkWidget *page = adw_preferences_page_new();
 
   std::string mode = setting_string(settings.get(), "input_mode");
   if (mode.empty())
@@ -1125,7 +1030,7 @@ GtkWidget *build_input_page() {
 }
 
 GtkWidget *build_phrases_page() {
-  GtkWidget *page = make_page("phrases", kPagePhrasesTitle, "user-bookmarks-symbolic");
+  GtkWidget *page = adw_preferences_page_new();
   GtkWidget *group = make_group(kPhrasesGroupTitle);
   app.phrase_group = group;
 
@@ -1147,14 +1052,14 @@ GtkWidget *build_phrases_page() {
 }
 
 GtkWidget *build_devices_page() {
-  GtkWidget *page = make_page("devices", kPageDevicesTitle, "network-workgroup-symbolic");
+  GtkWidget *page = adw_preferences_page_new();
   app.devices_page = page;
   refresh_devices_page();
   return page;
 }
 
 GtkWidget *build_about_page() {
-  GtkWidget *page = make_page("about", kPageAboutTitle, "help-about-symbolic");
+  GtkWidget *page = adw_preferences_page_new();
 
   GtkWidget *hero = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_halign(hero, GTK_ALIGN_CENTER);
@@ -1207,7 +1112,7 @@ GtkWidget *build_about_page() {
 }
 
 void on_visible_page_changed(GObject *object, GParamSpec *, gpointer) {
-  const char *name = adw_preferences_window_get_visible_page_name(ADW_PREFERENCES_WINDOW(object));
+  const char *name = adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(object));
   if (!name)
     return;
   if (std::strcmp(name, "phrases") == 0 && !app.phrases_loaded) {
@@ -1219,24 +1124,45 @@ void on_visible_page_changed(GObject *object, GParamSpec *, gpointer) {
 }
 
 GtkWidget *create_window() {
-  GtkWidget *window = adw_preferences_window_new();
+  GtkWidget *window = adw_application_window_new(GTK_APPLICATION(app.application));
   gtk_window_set_title(GTK_WINDOW(window), kAppName);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 800);
   gtk_window_set_default_icon_name("wetypex");
-  adw_preferences_window_set_search_enabled(ADW_PREFERENCES_WINDOW(window), FALSE);
 
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_input_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_phrases_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_devices_page()));
-  adw_preferences_window_add(ADW_PREFERENCES_WINDOW(window), ADW_PREFERENCES_PAGE(build_about_page()));
+  GtkWidget *toolbar = adw_toolbar_view_new();
+  GtkWidget *header = adw_header_bar_new();
+  GtkWidget *switcher = adw_view_switcher_new();
+  app.view_stack = adw_view_stack_new();
+  gtk_widget_set_vexpand(app.view_stack, TRUE);
+  adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_STACK(app.view_stack));
+  adw_header_bar_set_title_widget(ADW_HEADER_BAR(header), switcher);
+  adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(toolbar), header);
 
-  g_signal_connect(window, "notify::visible-page-name", G_CALLBACK(on_visible_page_changed), nullptr);
-  adw_preferences_window_set_visible_page_name(ADW_PREFERENCES_WINDOW(window), "input");
+  struct PageInfo {
+    const char *name;
+    const char *title;
+    const char *icon;
+    GtkWidget *(*create)();
+  };
+  const PageInfo pages[] = {
+      {"input", kPageInputTitle, "input-keyboard-symbolic", build_input_page},
+      {"phrases", kPagePhrasesTitle, "user-bookmarks-symbolic", build_phrases_page},
+      {"devices", kPageDevicesTitle, "network-workgroup-symbolic", build_devices_page},
+      {"about", kPageAboutTitle, "help-about-symbolic", build_about_page},
+  };
+  for (const auto &page : pages) {
+    auto *stack_page = adw_view_stack_add_titled(ADW_VIEW_STACK(app.view_stack), page.create(), page.name, page.title);
+    adw_view_stack_page_set_icon_name(stack_page, page.icon);
+  }
+  g_signal_connect(app.view_stack, "notify::visible-child-name", G_CALLBACK(on_visible_page_changed), nullptr);
+  adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), app.view_stack);
+  adw_application_window_set_content(ADW_APPLICATION_WINDOW(window), toolbar);
   return window;
 }
 
 void on_window_destroy(GtkWidget *, gpointer) {
   app.window = nullptr;
+  app.view_stack = nullptr;
   app.standalone_switch = nullptr;
   app.devices_page = nullptr;
   app.sync_status_row = nullptr;
@@ -1245,67 +1171,14 @@ void on_window_destroy(GtkWidget *, gpointer) {
   app.phrase_rows.clear();
   app.device_groups.clear();
   app.phrases_loaded = false;
-  if (app.application)
-    g_application_release(app.application);
 }
-
-void ensure_window() {
-  if (app.window)
-    return;
-  if (app.application)
-    g_application_hold(app.application);
-  app.window = create_window();
-  g_signal_connect(app.window, "destroy", G_CALLBACK(on_window_destroy), nullptr);
-}
-
-void present_page(const char *page) {
-  ensure_window();
-  const char *name = "input";
-  if (page && *page) {
-    char *end = nullptr;
-    const long index = g_ascii_strtoll(page, &end, 10);
-    if (end && *end == '\0') {
-      static const char *names[] = {"input", "phrases", "devices", "about"};
-      if (index >= 0 && index < 4)
-        name = names[index];
-    } else if (std::strcmp(page, "input") == 0 || std::strcmp(page, "phrases") == 0 ||
-               std::strcmp(page, "devices") == 0 || std::strcmp(page, "about") == 0) {
-      name = page;
-    }
-  }
-  adw_preferences_window_set_visible_page_name(ADW_PREFERENCES_WINDOW(app.window), name);
-  if (std::strcmp(name, "phrases") == 0 && !app.phrases_loaded) {
-    app.phrases_loaded = true;
-    reload_phrases();
-  }
-  if (std::strcmp(name, "devices") == 0 && !app.sync_updating)
-    refresh_devices_page();
-  gtk_window_present(GTK_WINDOW(app.window));
-}
-
-const char *page_argument(int argc, char **argv) {
-  for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--page") == 0 && i + 1 < argc)
-      return argv[i + 1];
-    if (std::strncmp(argv[i], "--page=", 7) == 0)
-      return argv[i] + 7;
-  }
-  return nullptr;
-}
-
-void on_startup(GApplication *, gpointer) { adw_init(); }
 
 void on_activate(GApplication *, gpointer) {
-  ensure_window();
+  if (!app.window) {
+    app.window = create_window();
+    g_signal_connect(app.window, "destroy", G_CALLBACK(on_window_destroy), nullptr);
+  }
   gtk_window_present(GTK_WINDOW(app.window));
-}
-
-gint on_command_line(GApplication *, GApplicationCommandLine *command_line, gpointer) {
-  int argc = 0;
-  char **argv = g_application_command_line_get_arguments(command_line, &argc);
-  present_page(page_argument(argc, argv));
-  g_strfreev(argv);
-  return 0;
 }
 
 } // namespace
@@ -1314,13 +1187,11 @@ int main(int argc, char **argv) {
   g_set_prgname("wetypex-settings");
   g_set_application_name(kAppName);
 
-  GApplication *application = g_application_new("org.freedesktop.IBus.Wetypex.Setup", G_APPLICATION_HANDLES_COMMAND_LINE);
+  AdwApplication *application = adw_application_new(kAppID, G_APPLICATION_FLAGS_NONE);
   app.application = application;
-  g_signal_connect(application, "startup", G_CALLBACK(on_startup), nullptr);
   g_signal_connect(application, "activate", G_CALLBACK(on_activate), nullptr);
-  g_signal_connect(application, "command-line", G_CALLBACK(on_command_line), nullptr);
 
-  const int status = g_application_run(application, argc, argv);
+  const int status = g_application_run(G_APPLICATION(application), argc, argv);
   g_object_unref(application);
   return status;
 }

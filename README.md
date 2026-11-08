@@ -74,12 +74,7 @@ WeTypeX IBus 引擎 ──────── 候选、预编辑、快捷键、�
 从 Release 界面下载对应发行版的最新版本：
 
 ```bash
-# Ubuntu 22.04
-sudo apt install ./ibus-wetypex_2.2.3.657-1jammy1_amd64.deb
-# Ubuntu 24.04
-sudo apt install ./ibus-wetypex_2.2.3.657-1noble1_amd64.deb
-# Ubuntu 26.04
-sudo apt install ./ibus-wetypex_2.2.3.657-1resolute1_amd64.deb
+sudo apt install ./ibus-wetypex_2.2.3.657-1_amd64.deb
 ```
 
 ### 从源码安装

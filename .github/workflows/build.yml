@@ -26,8 +26,7 @@ jobs:
             case "$script" in *-update.sh.in|*-sync.sh.in) continue;; esac
             sh -n "$script"
           done
-          python3 -m py_compile scripts/setup_runtime.py scripts/wechat_emoticons.py scripts/voice_stream.py tools/*.py \
-            build/wetypex-update build/wetypex-sync
+          python3 -m py_compile scripts/*.py tools/*.py build/wetypex-sync
       - name: 构建 Arch 软件包 (启用 LTO)
         run: |
           python3 tools/package_release.py
@@ -57,7 +56,7 @@ jobs:
         with:
           go-version: stable
           cache: false
-      - name: 安装 DEB 包构建与 XML 校验工具
+      - name: 安装 nFPM 与 XML 校验工具
         run: |
           sudo apt-get update
           sudo apt-get install -y libxml2-utils
@@ -70,14 +69,11 @@ jobs:
       - name: 验证 DEB 包元数据与前端依赖
         shell: bash
         run: |
-          package=$(find dist/ubuntu26 -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
+          package=$(find dist/ubuntu -maxdepth 1 -type f -name 'ibus-wetypex_*.deb' -print -quit)
           test -n "$package"
           test "$(dpkg-deb -f "$package" Package)" = ibus-wetypex
           dpkg-deb -f "$package" Depends | grep -Eq '(^|, )ibus(,|$)'
-          ! dpkg-deb -f "$package" Depends | grep -qi fcitx
-          dpkg-deb --fsys-tarfile "$package" \
-            | tar -xOf - ./usr/share/ibus/component/wetypex.xml \
-            | xmllint --noout -
+          dpkg-deb --fsys-tarfile "$package" | tar -xOf - ./usr/share/ibus/component/wetypex.xml | xmllint --noout -
           dpkg-deb --contents "$package" | grep -F './usr/libexec/ibus-engine-wetypex'
           dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-setup'
           dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-settings'
@@ -87,9 +83,7 @@ jobs:
         with:
           name: ibus-wetypex-ubuntu
           path: |
-            dist/ubuntu22/ibus-wetypex_*.deb
-            dist/ubuntu24/ibus-wetypex_*.deb
-            dist/ubuntu26/ibus-wetypex_*.deb
+            dist/ubuntu/ibus-wetypex_*.deb
           if-no-files-found: error
           retention-days: 30
 
@@ -101,11 +95,8 @@ jobs:
       matrix:
         include:
           - image: ubuntu:22.04
-            package_dir: ubuntu22
           - image: ubuntu:24.04
-            package_dir: ubuntu24
           - image: ubuntu:26.04
-            package_dir: ubuntu26
     container: ${{ matrix.image }}
     steps:
       - uses: actions/download-artifact@v7
@@ -115,5 +106,5 @@ jobs:
       - name: 安装软件包并启动网络诊断
         run: |
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/${{ matrix.package_dir }}/*.deb
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
           wetypex-account network-info

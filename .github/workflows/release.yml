@@ -83,7 +83,7 @@ jobs:
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
-            done < <(find arch ubuntu22 ubuntu24 ubuntu26 . -maxdepth 1 -type f \
+            done < <(find arch ubuntu . -maxdepth 1 -type f \
               \( -name 'ibus-wetypex-*.tar.gz' -o \
                  -name 'ibus-wetypex-*.pkg.tar.zst' -o \
                  -name 'ibus-wetypex_*.deb' \) \
@@ -97,9 +97,7 @@ jobs:
           path: |
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
-            dist/ubuntu22/ibus-wetypex_*.deb
-            dist/ubuntu24/ibus-wetypex_*.deb
-            dist/ubuntu26/ibus-wetypex_*.deb
+            dist/ubuntu/ibus-wetypex_*.deb
             dist/SHA256SUMS
 
       - name: 创建 GitHub Release
@@ -110,9 +108,7 @@ jobs:
           files=(
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
-            dist/ubuntu22/ibus-wetypex_*.deb
-            dist/ubuntu24/ibus-wetypex_*.deb
-            dist/ubuntu26/ibus-wetypex_*.deb
+            dist/ubuntu/ibus-wetypex_*.deb
             dist/SHA256SUMS
           )
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

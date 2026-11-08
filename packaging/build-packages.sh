@@ -7,7 +7,7 @@ output="$project_root/dist"
 stage="$output/root"
 
 mkdir -p "$output"
-find "$output" "$output/arch" "$output/ubuntu26" \
+find "$output" "$output/arch" "$output/ubuntu" \
     -maxdepth 1 -type f \
     \( -name 'ibus-wetypex-*.tar.gz' -o \
        -name 'ibus-wetypex-*.pkg.tar.zst' -o \
@@ -38,7 +38,7 @@ fi
     while IFS= read -r -d '' file; do
         digest=$(sha256sum "$file" | cut -d' ' -f1)
         printf '%s  %s\n' "$digest" "$(basename "$file")"
-    done < <(find . arch ubuntu26 -maxdepth 1 -type f \
+    done < <(find . arch ubuntu -maxdepth 1 -type f \
         \( -name 'ibus-wetypex-*.tar.gz' -o \
            -name 'ibus-wetypex-*.pkg.tar.zst' -o \
            -name 'ibus-wetypex_*.deb' -o \
