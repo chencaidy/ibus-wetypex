@@ -169,13 +169,14 @@ if(WETYPE_BUNDLED_CURL)
   add_dependencies(wetypex-wcwss-bridge wetypex-curl)
 endif()
 
+configure_file(data/ibus-setup-wetypex.desktop.in ibus-setup-wetypex.desktop @ONLY)
 configure_file(data/wetypex.xml.in wetypex.xml @ONLY)
 configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
-configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
+# configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
 configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
 configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
-configure_file(scripts/wetypex-update.sh.in wetypex-update @ONLY)
-configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
+# configure_file(scripts/wetypex-update.sh.in wetypex-update @ONLY)
+# configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
 configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME} RENAME locale.so)
@@ -191,11 +192,11 @@ install(TARGETS kqueue LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAM
 install(TARGETS wetypex-engine-host RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
+# install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 install(PROGRAMS scripts/setup_runtime.py tools/prepare_macos_runtime.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
@@ -208,7 +209,7 @@ install(DIRECTORY data/icons/hicolor/ DESTINATION ${CMAKE_INSTALL_DATADIR}/icons
 install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
 install(FILES data/wechat-emoticons.json DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
 install(FILES data/wetypex-symbols.json DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
-install(FILES data/wetypex-settings.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ibus-setup-wetypex.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/ibus/component)
 
 # Install docs and license

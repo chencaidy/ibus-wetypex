@@ -81,7 +81,7 @@ jobs:
           dpkg-deb --contents "$package" | grep -F './usr/libexec/ibus-engine-wetypex'
           dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-setup'
           dpkg-deb --contents "$package" | grep -F './usr/bin/wetypex-settings'
-          dpkg-deb --contents "$package" | grep -F './usr/share/applications/wetypex-settings.desktop'
+          dpkg-deb --contents "$package" | grep -F './usr/share/applications/ibus-setup-wetypex.desktop'
           dpkg-deb --contents "$package"
       - uses: actions/upload-artifact@v7
         with:
