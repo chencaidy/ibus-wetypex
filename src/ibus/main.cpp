@@ -212,7 +212,7 @@ void clearUi(EngineState *state) {
   state->renderedPreeditInitialized = true;
 }
 
-gboolean processKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers);
+gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers);
 
 size_t previousUtf8(const std::string &text, size_t position) {
   position = std::min(position, text.size());
@@ -611,7 +611,7 @@ void processResponse(EngineState *state, const std::string &line) {
   auto deferred = std::move(state->deferredKeys);
   state->deferredKeys.clear();
   for (const auto &key : deferred)
-    processKey(IBUS_ENGINE(state->owner), key.keyval, key.keycode, key.modifiers);
+    onProcessKey(IBUS_ENGINE(state->owner), key.keyval, key.keycode, key.modifiers);
 }
 
 void resetComposition(EngineState *state, bool sendReset) {
@@ -778,20 +778,13 @@ bool processPunctuation(EngineState *state, char ascii, bool englishMode) {
     }
   }
 
-  if (!sendRequest(state, "punctuation", std::string(1, ascii), 0, -1, -1, mapped)) {
-    if (!state->preedit.empty())
-      ibus_engine_commit_text(engine, ibus_text_new_from_string(state->preedit.c_str()));
-    ibus_engine_commit_text(engine, ibus_text_new_from_string(mapped.c_str()));
-  }
-
-  if (!state->preedit.empty()) {
-    state->preedit.clear();
-    state->displayPreedit.clear();
-    state->cursor = 0;
-    state->candidates.clear();
-    state->cloud.clear();
-  }
-  updateUi(state);
+  const bool hasComposition = !state->preedit.empty();
+  std::string commit =
+      hasComposition ? (!state->candidates.empty() ? state->candidates.front() : state->preedit) : std::string();
+  commit += mapped;
+  ibus_engine_commit_text(engine, ibus_text_new_from_string(commit.c_str()));
+  if (hasComposition)
+    resetComposition(state, true);
   return true;
 }
 
@@ -826,7 +819,7 @@ void updateCursor(EngineState *state, size_t position) {
   updateUi(state);
 }
 
-gboolean processKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
+gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
   const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
@@ -1153,7 +1146,7 @@ void wetype_engine_class_init(WeTypeEngineClass *klass) {
   auto *objectClass = G_OBJECT_CLASS(klass);
   objectClass->finalize = finalize;
   auto *engineClass = IBUS_ENGINE_CLASS(klass);
-  engineClass->process_key_event = processKey;
+  engineClass->process_key_event = onProcessKey;
   engineClass->focus_in = onFocusIn;
   engineClass->focus_out = onFocusOut;
   engineClass->enable = onEnable;
