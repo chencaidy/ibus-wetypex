@@ -160,7 +160,7 @@ int jsonInt(json_object *object, const char *key, int fallback) {
 
 Settings readSettings() {
   Settings settings;
-  const std::filesystem::path path = std::filesystem::path(g_get_user_config_dir()) / "fcitx5/wetypex.json";
+  const std::filesystem::path path = std::filesystem::path(g_get_user_config_dir()) / "ibus/wetypex/wetypex.json";
   std::ifstream file(path);
   if (!file)
     return settings;

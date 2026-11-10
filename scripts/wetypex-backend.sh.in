@@ -17,8 +17,8 @@ rm -f "$state/user/persistent_data/user_dict_clean_up.bin"
 if [ "${WETYPE_DEBUG:-0}" != 1 ]; then exec 2>/dev/null; fi
 
 standalone=0
-if [ -f "$config_home/fcitx5/wetypex.json" ]; then
-  standalone="$(python3 -c 'import json,sys; print(1 if json.load(open(sys.argv[1])).get("standalone",False) else 0)' "$config_home/fcitx5/wetypex.json" 2>/dev/null || printf 0)"
+if [ -f "$config_home/ibus/wetypex/wetypex.json" ]; then
+  standalone="$(python3 -c 'import json,sys; print(1 if json.load(open(sys.argv[1])).get("standalone",False) else 0)' "$config_home/ibus/wetypex/wetypex.json" 2>/dev/null || printf 0)"
 fi
 
 # The original desktop enables cloud candidates only when networking is

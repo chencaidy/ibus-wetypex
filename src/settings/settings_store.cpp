@@ -31,7 +31,7 @@ bool write_object(json_object *object) {
 } // namespace
 
 std::string config_path() {
-  gchar *directory = g_build_filename(g_get_user_config_dir(), "fcitx5", nullptr);
+  gchar *directory = g_build_filename(g_get_user_config_dir(), "ibus", "wetypex", nullptr);
   g_mkdir_with_parents(directory, 0755);
   gchar *path = g_build_filename(directory, "wetypex.json", nullptr);
   std::string result(path);

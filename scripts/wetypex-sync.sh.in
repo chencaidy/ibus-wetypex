@@ -14,7 +14,7 @@ def main():
     refresh_state = sys.argv[1:] == ["--refresh-state"]
     config_home = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home()/".config")
     try:
-        config = json.loads((config_home/"fcitx5/wetypex.json").read_text())
+        config = json.loads((config_home/"ibus/wetypex/wetypex.json").read_text())
     except (OSError, ValueError):
         config = {}
     if isinstance(config, dict) and config.get("standalone", False):

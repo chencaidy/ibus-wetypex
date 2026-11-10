@@ -3,7 +3,7 @@
 WeTypeX 的独立设置窗口配置文件路径：
 
 ```text
-${XDG_CONFIG_HOME:-$HOME/.config}/fcitx5/wetypex.json
+${XDG_CONFIG_HOME:-$HOME/.config}/ibus/wetypex/wetypex.json
 ```
 
 ## 输入

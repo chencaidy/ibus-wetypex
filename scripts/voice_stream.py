@@ -26,7 +26,7 @@ VOICE = STATE / 'voice'
 ACCOUNT = Path(os.environ.get('WETYPE_ACCOUNT_STATE_DIR', DATA / 'wetypex/account'))
 RUNTIME = Path(os.environ.get('WETYPE_RUNTIME_DIR', DATA / 'wetypex/runtime'))
 SUPPORT = Path(os.environ.get('WETYPE_SUPPORT_DIR', '/usr/lib/ibus-wetypex'))
-CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'fcitx5/wetypex.json'
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'ibus/wetypex/wetypex.json'
 ADDRESS = '\0wetypex-voice-{}-{}'.format(os.getuid(), hashlib.sha256(str(STATE.resolve()).encode()).hexdigest()[:20])
 LIMIT = 131072
 

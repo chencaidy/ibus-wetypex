@@ -156,7 +156,7 @@ wetypex-account sync-now     # 请求个人词库与常用语同步
 | 账户身份与原版业务状态 | `~/.local/share/wetypex/account` |
 | 用户词库、常用语与同步状态 | `~/.local/share/wetypex/state` |
 | 从官方包提取的界面资源 | `~/.local/share/wetypex/ui` |
-| WeTypeX 配置 | `~/.config/fcitx5/wetypex.json` |
+| WeTypeX 配置 | `~/.config/ibus/wetypex/wetypex.json` |
 
 卸载系统软件包不会自动删除这些用户数据。需要重新配对时，可先备份后自行删除 `account` 与 `state/sync-state.json`；普通升级不应删除它们。
 
