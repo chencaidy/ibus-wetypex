@@ -986,6 +986,8 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
   }
 
   gunichar unicode = ibus_keyval_to_unicode(keyval);
+  g_debug_func("unicode=U+%04X", unicode);
+
   if ((cleanModifiers & IBUS_SHIFT_MASK) && unicode >= 'a' && unicode <= 'z')
     unicode -= 'a' - 'A';
   const bool letter = (unicode >= 'a' && unicode <= 'z') || (unicode >= 'A' && unicode <= 'Z');

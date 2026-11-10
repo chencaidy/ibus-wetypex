@@ -130,6 +130,7 @@ target_link_libraries(wetypex-settings PRIVATE
 target_compile_definitions(wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
   WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
+  WETYPE_UPDATE_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-update"
   WETYPE_VERSION="${PROJECT_VERSION}")
 target_compile_options(wetypex-settings PRIVATE -Wall -Wextra)
 
@@ -176,7 +177,7 @@ configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
 # configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
 configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
 configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
-# configure_file(scripts/wetypex-update.sh.in wetypex-update @ONLY)
+configure_file(scripts/wetypex-update.py.in wetypex-update @ONLY)
 # configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
 configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
 
@@ -196,7 +197,7 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE
 # install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-# install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
 # install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
 

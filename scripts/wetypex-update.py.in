@@ -134,7 +134,7 @@ def main():
     config_home = pathlib.Path(
         os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")
     )
-    config = read_json(config_home / "fcitx5/wetypex.json")
+    config = read_json(config_home / "ibus/wetypex/wetypex.json")
     if not config.get("auto_update", True) and "--force" not in sys.argv:
         return 0
 

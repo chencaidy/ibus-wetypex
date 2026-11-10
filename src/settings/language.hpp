@@ -171,6 +171,11 @@ inline constexpr const char *kPairingSuccess = "设备关联成功";
 inline constexpr const char *kPairingFailed = "关联失败，请重试";
 
 // ---- 关于页 ----
+inline constexpr const char *kUpdateTitle = "检查更新";
+inline constexpr const char *kUpdateActionLabel = "检查";
+inline constexpr const char *kUpdateChecking = "正在检查更新";
+inline constexpr const char *kUpdateFinished = "检查结束";
+inline constexpr const char *kUpdateFailed = "检查更新失败，请稍后重试";
 inline constexpr const char *kDeveloperTitle = "开发者";
 inline constexpr const char *kLicenseTitle = "许可证";
 inline constexpr const char *kLicenseValue = "MIT/X11";
