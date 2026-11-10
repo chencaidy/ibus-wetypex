@@ -115,6 +115,7 @@ set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}")
 add_executable(ibus-engine-wetypex src/ibus/main.cpp)
 target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
 target_compile_definitions(ibus-engine-wetypex PRIVATE
+  G_LOG_DOMAIN="WeTypeX"
   WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
   WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
 target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)

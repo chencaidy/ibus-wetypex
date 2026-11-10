@@ -968,9 +968,11 @@ GtkWidget *build_input_page() {
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
                             switch_row(kEmojiRecommendTitle, kEmojiRecommendSubtitle, "emoji_recommend",
                                        setting_bool(settings.get(), "emoji_recommend", true)));
+  const std::string punctuation_mode = setting_string(settings.get(), "punctuation_mode");
+  const int punctuation_index = punctuation_mode == "fullwidth" ? 1 : (punctuation_mode == "halfwidth" ? 2 : 0);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
-                            switch_row(kChinesePunctuationTitle, kChinesePunctuationSubtitle, "chinese_punctuation",
-                                       setting_bool(settings.get(), "chinese_punctuation", true)));
+                            string_combo_row(kChinesePunctuationTitle, kChinesePunctuationSubtitle, "punctuation_mode",
+                                             kPunctuationModes, {"auto", "fullwidth", "halfwidth"}, punctuation_index));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
                             switch_row(kSlashPunctuationTitle, kSlashPunctuationSubtitle, "slash_punctuation",
                                        setting_bool(settings.get(), "slash_punctuation", true)));

@@ -20,6 +20,8 @@
 #include <string_view>
 #include <vector>
 
+#define g_debug_func(fmt, ...) g_debug("%s: " fmt, __func__, ##__VA_ARGS__)
+
 extern char **environ;
 
 namespace {
@@ -32,7 +34,7 @@ struct Settings {
   int pageSize = 5;
   bool shiftSwitch = true;
   bool standalone = false;
-  bool chinesePunctuation = true;
+  std::string punctuationMode = "auto";
   bool slashPunctuation = true;
   bool vertical = false;
   bool smartInput = true;
@@ -133,6 +135,7 @@ struct EngineState {
   bool selectionPending = false;
   bool renderedPreeditVisible = false;
   bool renderedPreeditInitialized = false;
+  bool isCursorBehindAscii = false;
 };
 
 uint64_t nextSession = 0;
@@ -178,7 +181,7 @@ Settings readSettings() {
   settings.pageSize = std::clamp(jsonInt(json.get(), "page_size", 5), 3, 9);
   settings.shiftSwitch = jsonBool(json.get(), "shift_switch", true);
   settings.standalone = jsonBool(json.get(), "standalone", false);
-  settings.chinesePunctuation = jsonBool(json.get(), "chinese_punctuation", true);
+  settings.punctuationMode = wire::str(json.get(), "punctuation_mode", "auto");
   settings.slashPunctuation = jsonBool(json.get(), "slash_punctuation", true);
   settings.vertical = jsonBool(json.get(), "vertical", false);
   settings.smartInput = jsonBool(json.get(), "smart_input", true);
@@ -498,7 +501,9 @@ bool sendRequest(EngineState *state, const char *operation, const std::string &k
   wire::put(request.get(), "index", int64_t(index));
   wire::put(request.get(), "revision", revision);
   wire::put(request.get(), "cursor", cursor);
-  wire::put(request.get(), "chinese_punctuation", int64_t(state->settings.chinesePunctuation));
+  const bool chinesePunctuation = state->settings.punctuationMode == "fullwidth" ||
+                                  (state->settings.punctuationMode == "auto" && !state->isCursorBehindAscii);
+  wire::put(request.get(), "chinese_punctuation", int64_t(chinesePunctuation));
   wire::put(request.get(), "mapped", mapped);
   putSettings(request.get(), state->settings);
   const std::string line = wire::dump(request.get());
@@ -510,32 +515,6 @@ bool sendRequest(EngineState *state, const char *operation, const std::string &k
       std::string_view(operation) == "delete" || std::string_view(operation) == "move")
     state->inputSequence = state->sequence;
   queueLine(state, line);
-  return true;
-}
-
-const PunctuationEntry *punctuationEntry(char ascii) {
-  auto it = std::find_if(kPunctuation.begin(), kPunctuation.end(),
-                         [ascii](const auto &entry) { return entry.ascii == ascii; });
-  return it == kPunctuation.end() ? nullptr : &*it;
-}
-
-std::string mappedPunctuation(const EngineState *state, char ascii, bool englishMode) {
-  const auto *entry = punctuationEntry(ascii);
-  if (!entry)
-    return std::string(1, ascii);
-  if (englishMode || !state->settings.chinesePunctuation)
-    return entry->english;
-  if (ascii == '/' && state->settings.slashPunctuation)
-    return "、";
-  return entry->normal;
-}
-
-bool splitPunctuationPair(const std::string &text, std::string &left, std::string &right) {
-  if (g_utf8_strlen(text.c_str(), -1) != 2)
-    return false;
-  const char *middle = g_utf8_offset_to_pointer(text.c_str(), 1);
-  left.assign(text.c_str(), middle - text.c_str());
-  right.assign(middle);
   return true;
 }
 
@@ -754,22 +733,49 @@ bool isCommandModifier(guint modifiers) {
   return (modifiers & mask) != 0;
 }
 
-bool processPunctuation(EngineState *state, char ascii, bool englishMode) {
-  const auto *entry = punctuationEntry(ascii);
-  if (!entry)
+bool splitPunctuationPair(const std::string &text, std::string &left, std::string &right) {
+  if (g_utf8_strlen(text.c_str(), -1) != 2)
+    return false;
+  const char *middle = g_utf8_offset_to_pointer(text.c_str(), 1);
+  left.assign(text.c_str(), middle - text.c_str());
+  right.assign(middle);
+  return true;
+}
+
+bool processPunctuation(EngineState *state, gunichar unicode) {
+  if (unicode < 0x20 || unicode > 0x7e)
+    return false;
+
+  const char ascii = static_cast<char>(unicode);
+  auto it = std::find_if(kPunctuation.begin(), kPunctuation.end(),
+                         [ascii](const auto &entry) { return entry.ascii == ascii; });
+  if (it == kPunctuation.end())
     return false;
 
   auto *engine = IBUS_ENGINE(state->owner);
-  std::string mapped = mappedPunctuation(state, ascii, englishMode);
+  std::string mapped;
   std::string left;
   std::string right;
-  if (entry->pairType && splitPunctuationPair(mapped, left, right)) {
+
+  const bool chinesePunctuation = state->settings.punctuationMode == "fullwidth" ||
+                                  (state->settings.punctuationMode == "auto" && !state->isCursorBehindAscii);
+  if (chinesePunctuation) {
+    if (ascii == '/' && state->settings.slashPunctuation) {
+      mapped = "、";
+    } else {
+      mapped = it->normal;
+    }
+  } else {
+    mapped = it->english;
+  }
+
+  if (it->pairType && splitPunctuationPair(mapped, left, right)) {
     // IBus cannot place the caret inside committed text: clients such as GTK4
     // and Qt drop ForwardKeyEvent, which leaves the caret after an inserted
     // closing symbol. Commit the opening symbol only; quotes alternate so the
     // closing side stays reachable. symbol_auto_pair therefore has no effect
     // in this frontend.
-    if (entry->pairType == 2) {
+    if (it->pairType == 2) {
       bool &leftNext = ascii == '"' ? state->doubleQuoteLeft : state->singleQuoteLeft;
       mapped = leftNext ? left : right;
       leftNext = !leftNext;
@@ -1002,10 +1008,8 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
     return TRUE;
   }
 
-  if (unicode >= 0x20 && unicode <= 0x7e) {
-    const char ascii = static_cast<char>(unicode);
-    if (punctuationEntry(ascii))
-      return processPunctuation(state, ascii, false);
+  if (processPunctuation(state, unicode)) {
+    return TRUE;
   }
 
   return FALSE;
@@ -1029,6 +1033,7 @@ void onFocusOut(IBusEngine *engine) {
 
 void onEnable(IBusEngine *engine) {
   g_debug("onEnable");
+  ibus_engine_get_surrounding_text(engine, nullptr, nullptr, nullptr);
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->enabled = true;
   activate(self->state);
@@ -1095,11 +1100,27 @@ void onCandidateClicked(IBusEngine *engine, guint index, guint, guint) {
   selectCandidate(state, static_cast<int>(index));
 }
 
-void onContentType(IBusEngine *engine, guint purpose, guint) {
-  g_debug("onContentType");
+void onContentType(IBusEngine *engine, guint purpose, guint hints) {
+  g_debug_func("purpose=%d hints=%d", purpose, hints);
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   state->contentPurpose = static_cast<int>(purpose);
   activate(state);
+}
+
+void onSetSurroundingText(IBusEngine *engine, IBusText *ibus_text, guint cursor_pos, guint) {
+  const gchar *text = ibus_text ? ibus_text_get_text(ibus_text) : nullptr;
+  if (!text || cursor_pos == 0) {
+    return;
+  }
+
+  const gchar *cursor_ptr = g_utf8_offset_to_pointer(text, cursor_pos);
+  const gchar *prev_ptr = g_utf8_find_prev_char(text, cursor_ptr);
+  if (prev_ptr) {
+    const gunichar unicode = g_utf8_get_char(prev_ptr);
+    auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
+    state->isCursorBehindAscii = (unicode >= 0x20 && unicode <= 0x7e) ? true : false;
+    g_debug_func("prev=U+%04X isCursorBehindAscii=%d", unicode, state->isCursorBehindAscii);
+  }
 }
 
 void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
@@ -1119,10 +1140,14 @@ void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
   updateModeProperty(state);
 }
 
-void onSetCapabilities(IBusEngine *engine, guint capabilities) {
-  g_debug("onSetCapabilities");
-  auto *self = reinterpret_cast<WeTypeEngine *>(engine);
-  self->parent.client_capabilities = capabilities;
+void onSetCapabilities(IBusEngine *engine, guint caps) {
+  g_debug_func("caps=0x%08x", caps);
+  if (caps & IBUS_CAP_SURROUNDING_TEXT) {
+    ibus_engine_get_surrounding_text(engine, nullptr, nullptr, nullptr);
+  } else {
+    auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
+    state->isCursorBehindAscii = true;
+  }
 }
 
 void finalize(GObject *object) {
@@ -1149,17 +1174,21 @@ void wetype_engine_class_init(WeTypeEngineClass *klass) {
   engineClass->process_key_event = onProcessKey;
   engineClass->focus_in = onFocusIn;
   engineClass->focus_out = onFocusOut;
+  engineClass->reset = onReset;
   engineClass->enable = onEnable;
   engineClass->disable = onDisable;
-  engineClass->reset = onReset;
+  // engineClass->set_cursor_location = onSetCursorLocation;
+  engineClass->set_capabilities = onSetCapabilities;
   engineClass->page_up = onPageUp;
   engineClass->page_down = onPageDown;
   engineClass->cursor_up = onCursorUp;
   engineClass->cursor_down = onCursorDown;
-  engineClass->candidate_clicked = onCandidateClicked;
-  engineClass->set_content_type = onContentType;
-  engineClass->set_capabilities = onSetCapabilities;
   engineClass->property_activate = onPropertyActivate;
+  // engineClass->property_show = onPropertyShow;
+  // engineClass->property_hide = onPropertyHide;
+  engineClass->candidate_clicked = onCandidateClicked;
+  engineClass->set_surrounding_text = onSetSurroundingText;
+  engineClass->set_content_type = onContentType;
 }
 
 void wetype_engine_init(WeTypeEngine *self) {
@@ -1179,6 +1208,7 @@ void wetype_engine_init(WeTypeEngine *self) {
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
+  g_set_prgname("ibus-wetypex");
 
   // Create
   ibus_init();
