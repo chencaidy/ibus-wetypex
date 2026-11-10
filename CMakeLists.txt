@@ -117,6 +117,7 @@ target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSO
 target_compile_definitions(ibus-engine-wetypex PRIVATE
   G_LOG_DOMAIN="WeTypeX"
   WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
+  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings"
   WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
 target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
 

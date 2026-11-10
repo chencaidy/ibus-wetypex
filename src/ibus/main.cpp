@@ -115,7 +115,6 @@ struct EngineState {
   std::vector<DeferredKey> deferredKeys;
   IBusPropList *properties = nullptr;
   IBusProperty *modeProperty = nullptr;
-  IBusProperty *restartProperty = nullptr;
   int candidatePage = 0;
   int candidateCursor = 0;
   int contentPurpose = IBUS_INPUT_PURPOSE_FREE_FORM;
@@ -653,7 +652,11 @@ void registerProperties(EngineState *state) {
                                       "system-restart", ibus_text_new_from_string("重启 WeTypeX 核心进程"), TRUE, TRUE,
                                       PROP_STATE_UNCHECKED, nullptr);
     ibus_prop_list_append(state->properties, restart);
-    state->restartProperty = mode;
+
+    auto *settings =
+        ibus_property_new("OpenSettings", PROP_TYPE_NORMAL, ibus_text_new_from_string("设置"), "preferences-system",
+                          ibus_text_new_from_string("打开 WeTypeX 设置"), TRUE, TRUE, PROP_STATE_UNCHECKED, nullptr);
+    ibus_prop_list_append(state->properties, settings);
   }
 
   ibus_engine_register_properties(IBUS_ENGINE(state->owner), state->properties);
@@ -1138,6 +1141,15 @@ void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
     setEnglishMode(state, !state->english);
   } else if (g_strcmp0(propertyName, "RestartBackend") == 0) {
     restartBackend(state);
+  } else if (g_strcmp0(propertyName, "OpenSettings") == 0) {
+    char *argv[] = {const_cast<char *>(WETYPE_SETTINGS), nullptr};
+    pid_t pid = -1;
+    const int result = posix_spawn(&pid, WETYPE_SETTINGS, nullptr, nullptr, argv, environ);
+    if (result != 0) {
+      g_warning("Unable to start WeTypeX settings: %s", g_strerror(result));
+    } else {
+      g_child_watch_add(pid, [](GPid childPid, gint, gpointer) { g_spawn_close_pid(childPid); }, nullptr);
+    }
   }
   updateModeProperty(state);
 }
