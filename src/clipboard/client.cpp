@@ -7,6 +7,7 @@
 // The extension may be disabled/enabled or restarted at any time. The daemon
 // watches its bus name: whenever a new owner appears it re-verifies the owner
 // and subscribes again; while it is absent, synchronization is paused.
+#include <gdk/gdk.h>
 #include <gio/gio.h>
 #include <glib-unix.h>
 #include <glib.h>
@@ -553,6 +554,32 @@ static bool set_remote_text(Daemon &daemon, const std::string &text, const Local
   return true;
 }
 
+// The outbox file is always uploaded as PNG; other formats (JPEG, TIFF, ...)
+// are decoded and re-encoded.
+static bool convert_to_png(const std::string &data, std::string *png) {
+  static const char SIGNATURE[] = "\x89PNG\r\n\x1a\n";
+  if (data.size() >= 8 && data.compare(0, 8, SIGNATURE, 8) == 0) {
+    *png = data;
+    return true;
+  }
+  g_autoptr(GBytes) input = g_bytes_new(data.data(), data.size());
+  g_autoptr(GError) err = nullptr;
+  g_autoptr(GdkTexture) texture = gdk_texture_new_from_bytes(input, &err);
+  if (!texture) {
+    g_warning("Cannot decode clipboard image: %s", err->message);
+    return false;
+  }
+  g_autoptr(GBytes) encoded = gdk_texture_save_to_png_bytes(texture);
+  gsize len = 0;
+  const auto *bytes = static_cast<const char *>(g_bytes_get_data(encoded, &len));
+  if (!bytes || len == 0) {
+    g_warning("Cannot encode clipboard image as PNG");
+    return false;
+  }
+  png->assign(bytes, len);
+  return true;
+}
+
 static bool set_remote_image(Daemon &daemon, const std::string &image, const LocalMark &expected) {
   if (!daemon.ext_ready) {
     g_debug("skipping remote image: extension not connected");
@@ -666,7 +693,8 @@ static bool sync_once(Daemon &daemon) {
       wire::Json sent;
       if (expected.kind == "image") {
         const std::string path = daemon.state_dir + "/clipboard-outbox.png";
-        if (write_private(path, daemon.local.data))
+        std::string png;
+        if (convert_to_png(daemon.local.data, &png) && write_private(path, png))
           sent = call_account(daemon, {"send-image", std::to_string(daemon.sync.group_id), path});
       } else {
         sent = call_account(daemon, {"send-clipboard", std::to_string(daemon.sync.group_id), daemon.local.data});

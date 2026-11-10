@@ -90,7 +90,7 @@ pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
 # endif()
 
 add_executable(wetypex-clipboard src/clipboard/client.cpp)
-target_link_libraries(wetypex-clipboard PRIVATE PkgConfig::GIO_UNIX PkgConfig::JSONC)
+target_link_libraries(wetypex-clipboard PRIVATE PkgConfig::GIO_UNIX PkgConfig::GTK4 PkgConfig::JSONC)
 target_compile_definitions(wetypex-clipboard PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account")
 target_compile_options(wetypex-clipboard PRIVATE -Wall -Wextra)
