@@ -2,7 +2,7 @@
 
 pkgname=ibus-wetypex
 pkgver=2.2.3.657
-pkgrel=1
+pkgrel=2
 pkgdesc="Native Linux compatibility layer for WeType on IBus"
 arch=('x86_64')
 url="https://github.com/chencaidy/ibus-wetypex"
