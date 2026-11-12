@@ -26,11 +26,8 @@ inline constexpr const char *kPageAboutTitle = "关于";
 // ---- 输入页：输入方案 ----
 inline constexpr const char *kGroupInputScheme = "输入方案";
 inline constexpr const char *kInputPinyinTitle = "拼音输入";
-inline constexpr const char *kInputPinyinSubtitle = "全拼输入";
 inline constexpr const char *kInputDoublePinyinTitle = "双拼输入";
-inline constexpr const char *kInputDoublePinyinSubtitle = "选择双拼方案";
 inline constexpr const char *kInputWubiTitle = "五笔输入";
-inline constexpr const char *kInputWubiSubtitle = "选择五笔方案";
 
 inline const std::vector<std::string> kDoublePinyinSchemes = {"自然码",   "搜狗", "微软",    "小鹤",
                                                               "拼音加加", "紫光", "智能 ABC"};

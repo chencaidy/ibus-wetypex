@@ -178,11 +178,9 @@ void add_switch_rows(GtkWidget *expander, const std::vector<SwitchOption> &optio
   }
 }
 
-GtkWidget *mode_row(const char *title, const char *subtitle, GtkCheckButton *radio) {
+GtkWidget *mode_row(const char *title, GtkCheckButton *radio) {
   GtkWidget *row = adw_action_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
-  if (subtitle && *subtitle)
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle);
   adw_action_row_add_prefix(ADW_ACTION_ROW(row), GTK_WIDGET(radio));
   return row;
 }
@@ -200,12 +198,10 @@ void on_scheme_selected(GObject *object, GParamSpec *, gpointer) {
     gtk_check_button_set_active(radio, TRUE);
 }
 
-GtkWidget *scheme_combo_row(const char *title, const char *subtitle, const char *key, GtkCheckButton *radio,
+GtkWidget *scheme_combo_row(const char *title, const char *key, GtkCheckButton *radio,
                             const std::vector<std::string> &items, int current) {
   GtkWidget *row = adw_combo_row_new();
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), title);
-  if (subtitle && *subtitle)
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle);
 
   GtkStringList *model = gtk_string_list_new(nullptr);
   for (const auto &item : items)
@@ -931,15 +927,13 @@ GtkWidget *build_input_page() {
   }
 
   GtkWidget *scheme_group = make_group(kGroupInputScheme);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group), mode_row(kInputPinyinTitle, GTK_CHECK_BUTTON(pinyin)));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
-                            mode_row(kInputPinyinTitle, kInputPinyinSubtitle, GTK_CHECK_BUTTON(pinyin)));
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
-                            scheme_combo_row(kInputDoublePinyinTitle, kInputDoublePinyinSubtitle,
-                                             "double_pinyin_scheme", GTK_CHECK_BUTTON(double_pinyin), schemes,
+                            scheme_combo_row(kInputDoublePinyinTitle, "double_pinyin_scheme",
+                                             GTK_CHECK_BUTTON(double_pinyin), schemes,
                                              setting_int(settings.get(), "double_pinyin_scheme", 0)));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(scheme_group),
-                            scheme_combo_row(kInputWubiTitle, kInputWubiSubtitle, "wubi_solution",
-                                             GTK_CHECK_BUTTON(wubi), wubi_solutions,
+                            scheme_combo_row(kInputWubiTitle, "wubi_solution", GTK_CHECK_BUTTON(wubi), wubi_solutions,
                                              setting_int(settings.get(), "wubi_solution", 0)));
   adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(scheme_group));
 
@@ -1201,7 +1195,7 @@ int main(int argc, char **argv) {
   g_set_prgname("wetypex-settings");
   g_set_application_name(kAppName);
 
-  AdwApplication *application = adw_application_new(kAppID, G_APPLICATION_FLAGS_NONE);
+  AdwApplication *application = adw_application_new(kAppID, static_cast<GApplicationFlags>(0));
   app.application = application;
   g_signal_connect(application, "activate", G_CALLBACK(on_activate), nullptr);
 
