@@ -171,10 +171,16 @@ inline constexpr const char *kPairingSuccess = "设备关联成功";
 inline constexpr const char *kPairingFailed = "关联失败，请重试";
 
 // ---- 关于页 ----
+inline constexpr const char *kVersionUnavailable = "未知版本";
 inline constexpr const char *kUpdateTitle = "检查更新";
 inline constexpr const char *kUpdateActionLabel = "检查";
 inline constexpr const char *kUpdateChecking = "正在检查更新";
-inline constexpr const char *kUpdateFinished = "检查结束";
+inline constexpr const char *kUpdateNoUpdate = "当前已是最新版本";
+inline constexpr const char *kUpdateAvailable = "发现新版本：";
+inline constexpr const char *kUpdateInstall = "安装";
+inline constexpr const char *kUpdateInstalling = "正在下载并安装更新";
+inline constexpr const char *kUpdateInstalled = "更新安装成功，请重新启动应用";
+inline constexpr const char *kUpdateInstallFailed = "安装更新失败";
 inline constexpr const char *kUpdateFailed = "检查更新失败，请稍后重试";
 inline constexpr const char *kDeveloperTitle = "开发者";
 inline constexpr const char *kLicenseTitle = "许可证";

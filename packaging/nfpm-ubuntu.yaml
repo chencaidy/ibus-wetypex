@@ -21,6 +21,7 @@ overrides:
     depends:
       - bubblewrap
       - ca-certificates
+      - curl
       - ffmpeg
       - fontconfig
       - ibus

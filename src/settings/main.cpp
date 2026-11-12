@@ -1,4 +1,5 @@
 #include "account_client.hpp"
+#include "check_update.hpp"
 #include "engine_client.hpp"
 #include "language.hpp"
 #include "settings_store.hpp"
@@ -11,17 +12,10 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <string>
 #include <vector>
-
-#ifndef WETYPE_VERSION
-#define WETYPE_VERSION "unknown"
-#endif
-
-#ifndef WETYPE_UPDATE_TOOL
-#define WETYPE_UPDATE_TOOL "wetypex-update"
-#endif
 
 using namespace ibus_settings;
 using namespace ibus_settings::lang;
@@ -1064,45 +1058,6 @@ GtkWidget *build_devices_page() {
   return page;
 }
 
-struct UpdateCheckState {
-  GtkWidget *row;
-  GtkWidget *button;
-};
-
-void on_check_update(GtkButton *button, gpointer data) {
-  GtkWidget *row = GTK_WIDGET(data);
-  const char *configured = g_getenv("WETYPE_UPDATE_TOOL");
-  const char *tool = configured && *configured ? configured : WETYPE_UPDATE_TOOL;
-  GError *error = nullptr;
-  GSubprocess *process = g_subprocess_new(
-      static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_SILENCE | G_SUBPROCESS_FLAGS_STDERR_SILENCE), &error,
-      tool, "--force", nullptr);
-  if (!process) {
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), kUpdateFailed);
-    g_clear_error(&error);
-    return;
-  }
-
-  gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
-  adw_action_row_set_subtitle(ADW_ACTION_ROW(row), kUpdateChecking);
-  auto *state = new UpdateCheckState{GTK_WIDGET(g_object_ref(row)), GTK_WIDGET(g_object_ref(button))};
-  g_subprocess_wait_check_async(
-      process, nullptr,
-      [](GObject *source, GAsyncResult *result, gpointer data) {
-        auto *state = static_cast<UpdateCheckState *>(data);
-        GError *error = nullptr;
-        const bool ok = g_subprocess_wait_check_finish(G_SUBPROCESS(source), result, &error);
-        adw_action_row_set_subtitle(ADW_ACTION_ROW(state->row), ok ? kUpdateFinished : kUpdateFailed);
-        gtk_widget_set_sensitive(state->button, TRUE);
-        g_clear_error(&error);
-        g_object_unref(state->row);
-        g_object_unref(state->button);
-        delete state;
-      },
-      state);
-  g_object_unref(process);
-}
-
 GtkWidget *build_about_page() {
   GtkWidget *page = adw_preferences_page_new();
 
@@ -1119,8 +1074,15 @@ GtkWidget *build_about_page() {
   gtk_widget_add_css_class(name, "title-1");
   gtk_box_append(GTK_BOX(hero), name);
 
-  GtkWidget *version = gtk_label_new(WETYPE_VERSION);
+  GtkWidget *version = gtk_label_new("");
   gtk_widget_add_css_class(version, "dim-label");
+  try {
+    const auto installed = get_installed_version();
+    gtk_label_set_text(GTK_LABEL(version), installed.c_str());
+  } catch (const std::exception &error) {
+    gtk_label_set_text(GTK_LABEL(version), kVersionUnavailable);
+    g_warning("Unable to query installed WeTypeX version: %s", error.what());
+  }
   gtk_box_append(GTK_BOX(hero), version);
 
   GtkWidget *hero_group = adw_preferences_group_new();
@@ -1130,7 +1092,7 @@ GtkWidget *build_about_page() {
   GtkWidget *update = action_row(kUpdateTitle);
   GtkWidget *update_button = gtk_button_new_with_label(kUpdateActionLabel);
   gtk_widget_set_valign(update_button, GTK_ALIGN_CENTER);
-  g_signal_connect(update_button, "clicked", G_CALLBACK(on_check_update), update);
+  setup_update_check(ADW_ACTION_ROW(update), GTK_BUTTON(update_button));
   adw_action_row_add_suffix(ADW_ACTION_ROW(update), update_button);
 
   GtkWidget *developer = action_row(kDeveloperTitle, kDeveloperName);

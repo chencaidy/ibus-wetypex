@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(ibus-wetypex VERSION 2.2.3.657 LANGUAGES C CXX)
 
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in"
-  WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in" WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
 string(REGEX REPLACE "^pkgrel=" "" WETYPE_PACKAGE_RELEASE "${WETYPE_PACKAGE_RELEASE_LINE}")
 
 if(POLICY CMP0135)
@@ -123,6 +122,7 @@ target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
 
 add_executable(wetypex-settings
   src/settings/main.cpp
+  src/settings/check_update.cpp
   src/settings/settings_store.cpp
   src/settings/engine_client.cpp
   src/settings/account_client.cpp)
@@ -130,9 +130,7 @@ target_link_libraries(wetypex-settings PRIVATE
   PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
 target_compile_definitions(wetypex-settings PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
-  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
-  WETYPE_UPDATE_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-update"
-  WETYPE_VERSION="${PROJECT_VERSION}")
+  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend")
 target_compile_options(wetypex-settings PRIVATE -Wall -Wextra)
 
 add_executable(wetypex-engine-host src/backend/macos_host.cpp)
@@ -178,7 +176,6 @@ configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
 # configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
 configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
 configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
-configure_file(scripts/wetypex-update.py.in wetypex-update @ONLY)
 # configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
 configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
 
@@ -198,7 +195,6 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE
 # install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-update DESTINATION ${CMAKE_INSTALL_BINDIR})
 # install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
 
