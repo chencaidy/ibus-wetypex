@@ -82,6 +82,7 @@ fi
 
 # Show usage
 cat <<'EOF'
+
 WeTypeX已安装, 请完成下述配置:
 
   1. 准备官方运行时:
@@ -96,4 +97,5 @@ WeTypeX已安装, 请完成下述配置:
      gnome-extensions enable wetypex-clip-watcher@caidy.cc
    
 完整说明: https://github.com/chencaidy/ibus-wetypex
+
 EOF

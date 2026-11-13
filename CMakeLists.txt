@@ -62,14 +62,6 @@ pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
 # target_compile_definitions(wetypex-ai-viewer PRIVATE
 #   WETYPE_AI_HELPER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-ai")
 
-# add_executable(wetypex-transfer src/transfer/main.cpp)
-# target_link_libraries(wetypex-transfer PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
-# target_compile_definitions(wetypex-transfer PRIVATE
-#   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
-#   WETYPE_ENGINE_HOST="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}/wetypex-engine-host"
-#   WETYPE_SUPPORT_DIR="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}"
-#   WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings")
-
 # add_executable(wetypex-vmode src/vmode.cpp)
 # target_link_libraries(wetypex-vmode PRIVATE ${WETYPE_QT_PACKAGE}::Widgets ${WETYPE_QT_PACKAGE}::Network)
 # set(WETYPE_LAYER_SHELL "AUTO" CACHE STRING "Wayland V toolbar: AUTO, ON or OFF")
@@ -94,6 +86,39 @@ target_compile_definitions(wetypex-clipboard PRIVATE
   WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account")
 target_compile_options(wetypex-clipboard PRIVATE -Wall -Wextra)
 
+add_executable(wetypex-settings
+  src/settings/main.cpp
+  src/settings/check_update.cpp
+  src/settings/settings_store.cpp
+  src/settings/engine_client.cpp
+  src/settings/account_client.cpp)
+target_include_directories(wetypex-settings PUBLIC src/common)
+target_link_libraries(wetypex-settings PRIVATE PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
+target_compile_definitions(wetypex-settings PRIVATE
+  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
+  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend")
+target_compile_options(wetypex-settings PRIVATE -Wall -Wextra)
+
+add_executable(wetypex-transfer src/transfer/main.cpp)
+target_include_directories(wetypex-transfer PUBLIC src/common)
+target_link_libraries(wetypex-transfer PRIVATE PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
+target_compile_definitions(wetypex-transfer PRIVATE
+  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
+  WETYPE_ENGINE_HOST="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}/wetypex-engine-host"
+  WETYPE_SUPPORT_DIR="${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}"
+  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings")
+target_compile_options(wetypex-transfer PRIVATE -Wall -Wextra)
+
+add_executable(ibus-engine-wetypex src/ibus/main.cpp)
+target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
+target_compile_definitions(ibus-engine-wetypex PRIVATE
+  G_LOG_DOMAIN="WeTypeX"
+  WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
+  WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-transfer"
+  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings"
+  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
+target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
+
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
   message(FATAL_ERROR "The verified original engine sample requires Linux x86-64")
 endif()
@@ -108,30 +133,6 @@ if(NOT kqueue_POPULATED)
   FetchContent_Populate(kqueue)
   add_subdirectory(${kqueue_SOURCE_DIR} ${kqueue_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
-
-set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}")
-
-add_executable(ibus-engine-wetypex src/ibus/main.cpp)
-target_link_libraries(ibus-engine-wetypex PRIVATE PkgConfig::IBUS PkgConfig::JSONC)
-target_compile_definitions(ibus-engine-wetypex PRIVATE
-  G_LOG_DOMAIN="WeTypeX"
-  WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
-  WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings"
-  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
-target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
-
-add_executable(wetypex-settings
-  src/settings/main.cpp
-  src/settings/check_update.cpp
-  src/settings/settings_store.cpp
-  src/settings/engine_client.cpp
-  src/settings/account_client.cpp)
-target_link_libraries(wetypex-settings PRIVATE
-  PkgConfig::ADW PkgConfig::GTK4 PkgConfig::GIO_UNIX PkgConfig::JSONC)
-target_compile_definitions(wetypex-settings PRIVATE
-  WETYPE_ACCOUNT_TOOL="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-account"
-  WETYPE_BACKEND="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend")
-target_compile_options(wetypex-settings PRIVATE -Wall -Wextra)
 
 add_executable(wetypex-engine-host src/backend/macos_host.cpp)
 add_dependencies(wetypex-engine-host kqueue)
@@ -170,6 +171,7 @@ if(WETYPE_BUNDLED_CURL)
   add_dependencies(wetypex-wcwss-bridge wetypex-curl)
 endif()
 
+set(WETYPE_SUPPORT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}")
 configure_file(data/ibus-setup-wetypex.desktop.in ibus-setup-wetypex.desktop @ONLY)
 configure_file(data/wetypex.xml.in wetypex.xml @ONLY)
 configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
@@ -185,7 +187,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wcwss_bridge.so DESTINATION ${CMAKE_IN
 # install(TARGETS wetypex-ai-viewer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS wetypex-clipboard RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS wetypex-settings RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-# install(TARGETS wetypex-transfer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS wetypex-transfer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 # install(TARGETS wetypex-vmode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(TARGETS ibus-engine-wetypex RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 install(TARGETS kqueue LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME})
