@@ -1,6 +1,6 @@
 pkgname=ibus-wetypex
 pkgver=2.2.3.657
-pkgrel=2
+pkgrel=3
 pkgdesc='WeTypeX native Linux input method for IBus'
 url='https://github.com/chencaidy/ibus-wetypex'
 arch=('x86_64')

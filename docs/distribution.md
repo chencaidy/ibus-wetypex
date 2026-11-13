@@ -37,7 +37,7 @@ Ubuntu 变体使用 `ibus-wetypex` 包名，共享可执行文件和数据安装
 bash packaging/build-ubuntu-package.sh
 ```
 
-该脚本需要 Docker 和 nFPM，生成的 `.deb` 位于 `dist/ibus/`。包依赖 IBus、GTK4、libadwaita 与共享业务运行时，引擎元数据安装到 `/usr/share/ibus/component`，可执行引擎安装到隔离的 libexec 目录。其中设置窗口是独立的 GTK4 + libadwaita 程序；剪贴板扩展安装到 `/usr/share/gnome-shell/extensions/wetypex-clip-watcher@caidy.cc`，用户重新登录后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc` 启用。运行时配置、账户及剪贴板同步仍沿用现有 XDG 用户数据路径。首版不提供 AI、语音、V 模式或剪贴板历史。源码构建需要 `libgtk-4-dev`、`libadwaita-1-dev`、`libjson-c-dev` 和 `libibus-1.0-dev`。
+该脚本需要 Docker 和 nFPM，生成的 `.deb` 位于 `dist/ibus/`。包依赖 IBus、GTK4、libadwaita 与共享业务运行时，引擎元数据安装到 `/usr/share/ibus/component`，可执行引擎安装到隔离的 libexec 目录。设置窗口和隔空传送窗口均为独立的 GTK4 + libadwaita 程序；剪贴板扩展安装到 `/usr/share/gnome-shell/extensions/wetypex-clip-watcher@caidy.cc`，用户重新登录后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc` 启用。运行时配置、账户及剪贴板同步仍沿用现有 XDG 用户数据路径。首版不提供 AI、语音、V 模式或剪贴板历史。源码构建需要 `libgtk-4-dev`、`libadwaita-1-dev`、`libjson-c-dev` 和 `libibus-1.0-dev`。
 
 也可以只生成源码包与 Arch 构建文件：
 
