@@ -108,3 +108,85 @@ jobs:
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
           wetypex-account network-info
+
+  fedora-rpm:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 安装构建依赖
+        run: |
+          dnf install -y \
+            git cmake gcc-c++ clang make \
+            libstdc++-devel libcxx-devel \
+            glib2-devel gtk3-devel gtk4-devel \
+            libadwaita-devel ibus-devel json-c-devel \
+            libcurl-devel pkgconf-pkg-config \
+            bubblewrap rpm-build rpmdevtools \
+            tar gzip
+
+      - name: 配置与构建
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --parallel 1 --verbose
+
+      - name: 暂存安装文件
+        run: |
+          rm -rf pkg
+          DESTDIR="$PWD/pkg" cmake --install build --prefix /usr
+
+      - name: 生成 RPM spec
+        run: |
+          version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt | head -n1)
+          test -n "$version"
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p dist/fedora
+          tar -czf ~/rpmbuild/SOURCES/ibus-wetypex.tar.gz -C pkg .
+          sed 's/^[[:space:]]*//' > ~/rpmbuild/SPECS/ibus-wetypex.spec <<EOF
+          %global debug_package %{nil}
+
+          Name:           ibus-wetypex
+          Version:        ${version}
+          Release:        1%{?dist}
+          Summary:        WeTypeX IBus input method
+          License:        MIT
+          BuildArch:      x86_64
+
+          %description
+          WeTypeX IBus input method for Fedora Linux.
+
+          %prep
+          %setup -q -c -T
+          tar -xzf %{_sourcedir}/ibus-wetypex.tar.gz
+
+          %install
+          mkdir -p %{buildroot}
+          cp -a usr %{buildroot}/
+
+          %files
+          /usr/bin/*
+          /usr/lib64/*
+          /usr/libexec/*
+          /usr/share/*
+
+          %changelog
+          * $(LC_ALL=C date '+%a %b %d %Y') WeTypeX CI <noreply@example.com> - ${version}-1
+          - Initial Fedora package
+          EOF
+
+      - name: 构建 RPM
+        run: |
+          rpmbuild -ba ~/rpmbuild/SPECS/ibus-wetypex.spec
+          cp ~/rpmbuild/RPMS/*/*.rpm dist/fedora/
+
+      - name: 保存 Fedora RPM
+        uses: actions/upload-artifact@v7
+        with:
+          name: ibus-wetypex-fedora-rpm
+          path: dist/fedora/*.rpm
+          if-no-files-found: error
+          retention-days: 30

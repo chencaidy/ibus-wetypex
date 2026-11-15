@@ -20,8 +20,92 @@ permissions:
   contents: write
 
 jobs:
+  fedora-rpm:
+    if: ${{ !inputs.only_aur }}
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: 安装构建依赖
+        run: |
+          dnf install -y \
+            git cmake gcc-c++ clang make \
+            libstdc++-devel libcxx-devel \
+            glib2-devel gtk3-devel gtk4-devel \
+            libadwaita-devel ibus-devel json-c-devel \
+            libcurl-devel pkgconf-pkg-config \
+            bubblewrap rpm-build rpmdevtools \
+            tar gzip
+
+      - name: 配置与构建
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --parallel 1 --verbose
+
+      - name: 暂存安装文件
+        run: |
+          rm -rf pkg
+          DESTDIR="$PWD/pkg" cmake --install build --prefix /usr
+
+      - name: 生成 RPM spec
+        run: |
+          version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt | head -n1)
+          test -n "$version"
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p dist/fedora
+          tar -czf ~/rpmbuild/SOURCES/ibus-wetypex.tar.gz -C pkg .
+          sed 's/^[[:space:]]*//' > ~/rpmbuild/SPECS/ibus-wetypex.spec <<EOF
+          %global debug_package %{nil}
+
+          Name:           ibus-wetypex
+          Version:        ${version}
+          Release:        1%{?dist}
+          Summary:        WeTypeX IBus input method
+          License:        MIT
+          BuildArch:      x86_64
+
+          %description
+          WeTypeX IBus input method for Fedora Linux.
+
+          %prep
+          %setup -q -c -T
+          tar -xzf %{_sourcedir}/ibus-wetypex.tar.gz
+
+          %install
+          mkdir -p %{buildroot}
+          cp -a usr %{buildroot}/
+
+          %files
+          /usr/bin/*
+          /usr/lib64/*
+          /usr/libexec/*
+          /usr/share/*
+
+          %changelog
+          * $(LC_ALL=C date '+%a %b %d %Y') WeTypeX CI <noreply@example.com> - ${version}-1
+          - Initial Fedora package
+          EOF
+
+      - name: 构建 RPM
+        run: |
+          rpmbuild -ba ~/rpmbuild/SPECS/ibus-wetypex.spec
+          cp ~/rpmbuild/RPMS/*/*.rpm dist/fedora/
+
+      - name: 保存 Fedora RPM
+        uses: actions/upload-artifact@v7
+        with:
+          name: ibus-wetypex-fedora-rpm
+          path: dist/fedora/*.rpm
+          if-no-files-found: error
+
   release:
     if: ${{ !inputs.only_aur }}
+    needs: fedora-rpm
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
@@ -75,6 +159,11 @@ jobs:
               cp /tmp/arch/ibus-wetypex-[0-9]*-x86_64.pkg.tar.zst /out/arch/
             '
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: ibus-wetypex-fedora-rpm
+          path: dist/fedora
+
       - name: 生成便携归档与校验和
         shell: bash
         run: |
@@ -83,10 +172,11 @@ jobs:
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
-            done < <(find arch ubuntu . -maxdepth 1 -type f \
+            done < <(find arch ubuntu fedora . -maxdepth 1 -type f \
               \( -name 'ibus-wetypex-*.tar.gz' -o \
                  -name 'ibus-wetypex-*.pkg.tar.zst' -o \
-                 -name 'ibus-wetypex_*.deb' \) \
+                 -name 'ibus-wetypex_*.deb' -o \
+                 -name 'ibus-wetypex-*.rpm' \) \
               -print0 | sort -z)
           ) > dist/SHA256SUMS
 
@@ -98,6 +188,7 @@ jobs:
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/ubuntu/ibus-wetypex_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
             dist/SHA256SUMS
 
       - name: 创建 GitHub Release
@@ -109,6 +200,7 @@ jobs:
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/ubuntu/ibus-wetypex_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
             dist/SHA256SUMS
           )
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
