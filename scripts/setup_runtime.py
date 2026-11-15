@@ -13,12 +13,21 @@ import tempfile
 import urllib.request
 import zipfile
 
-UPSTREAM_VERSION='2.2.3.657'
+# 输入核心与词典：macOS 3.0.1.684 官方包
+UPSTREAM_VERSION='3.0.1.684'
 UPSTREAM_RELEASE,UPSTREAM_BUILD=UPSTREAM_VERSION.rsplit('.',1)
 UPSTREAM_ARCHIVE=f'WeType_{UPSTREAM_RELEASE}_{UPSTREAM_BUILD}.zip'
 URL=f'https://download.weread.qq.com/app/wxkb/mac/{UPSTREAM_RELEASE}/{UPSTREAM_ARCHIVE}'
-ARCHIVE_SHA='8ef48bb21fe9d7b017b8a09fb9496b1b8f960ad960db27872226e08c09db264b'
-ENGINE_SHA='a68a92300cc38e5941f59832c516a37eb098c10c6bbe47ab3dcbe812705cf5ee'
+ARCHIVE_SHA='03421f7460ad5e1cff125ed2c257c80dfb37ca4c3dba668310da336e7b90aa82'
+ENGINE_SHA='91cb8e4bf84f68d9aa81c777ed3ec3fbc0a2fec9664ad189f007d3ed6460ffa3'
+
+# 隔空传送模块、界面资源、微信表情与语音 VAD：继续取 2.2.3.657 官方包。
+# 3.x 的 Flurry/WXP2P 改用 Objective-C / Swift 接口，兼容宿主尚未适配。
+ASSETS_VERSION='2.2.3.657'
+ASSETS_RELEASE,ASSETS_BUILD=ASSETS_VERSION.rsplit('.',1)
+ASSETS_ARCHIVE=f'WeType_{ASSETS_RELEASE}_{ASSETS_BUILD}.zip'
+ASSETS_URL=f'https://download.weread.qq.com/app/wxkb/mac/{ASSETS_RELEASE}/{ASSETS_ARCHIVE}'
+ASSETS_SHA='8ef48bb21fe9d7b017b8a09fb9496b1b8f960ad960db27872226e08c09db264b'
 FLURRY_SHA='4c97f45b03c511bf0611c7ccc39537b370b4dfba6ba3ba1ba4d9a42e4b6bbd39'
 WXP2P_SHA='f99240391cbbb45c8162c9661ec1c7c3932aac53e4c674260b2be1cfcea963d6'
 
@@ -219,8 +228,10 @@ def validate_runtime(target):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--archive',type=pathlib.Path,help=f'Original {UPSTREAM_ARCHIVE}')
-    ap.add_argument('--download',action='store_true',help='Download the pinned original package from Tencent')
+    ap.add_argument('--archive',type=pathlib.Path,help=f'Original {UPSTREAM_ARCHIVE} (input core and dictionaries)')
+    ap.add_argument('--assets-archive',type=pathlib.Path,
+                    help=f'Original {ASSETS_ARCHIVE} (transfer modules, UI assets, VAD)')
+    ap.add_argument('--download',action='store_true',help='Download both pinned original packages from Tencent')
     ap.add_argument('--accept-upstream-license',action='store_true',help='Confirm acceptance of the upstream license before downloading')
     ap.add_argument('--check',action='store_true')
     ap.add_argument('--icons-only',action='store_true',help='Install original icons from the verified archive without replacing the engine')
@@ -282,12 +293,20 @@ def main():
     with tempfile.TemporaryDirectory(prefix='.wetype-setup-',dir=target.parent) as temporary:
         temp=pathlib.Path(temporary)
         archive=args.archive
+        assets_archive=args.assets_archive
         if args.download:
-            archive=temp/'original.zip';print('Downloading the pinned original package…',flush=True)
+            archive=temp/'original.zip'
+            print(f'Downloading {UPSTREAM_ARCHIVE}…',flush=True)
             with urllib.request.urlopen(URL,timeout=60) as response,archive.open('wb') as out:shutil.copyfileobj(response,out)
+            assets_archive=temp/'assets.zip'
+            print(f'Downloading {ASSETS_ARCHIVE}…',flush=True)
+            with urllib.request.urlopen(ASSETS_URL,timeout=60) as response,assets_archive.open('wb') as out:shutil.copyfileobj(response,out)
+        elif assets_archive is None:
+            ap.error(f'--archive requires --assets-archive {ASSETS_ARCHIVE}; or use --download')
         if digest(archive)!=ARCHIVE_SHA:raise ValueError(f'Archive SHA-256 mismatch; expected the verified {UPSTREAM_VERSION} package')
-        install_ui_resources(archive,data)
-        install_voice_resources(archive,data)
+        if digest(assets_archive)!=ASSETS_SHA:raise ValueError(f'Assets archive SHA-256 mismatch; expected the verified {ASSETS_VERSION} package')
+        install_ui_resources(assets_archive,data)
+        install_voice_resources(assets_archive,data)
         if args.icons_only:
             print('Original UI assets installed in '+str(data/'wetypex/ui'))
             return 0
@@ -295,22 +314,24 @@ def main():
         original=temp/'WeType'
         with zipfile.ZipFile(archive) as z:
             original.write_bytes(z.read('WeType.app/Contents/MacOS/WeType'))
-            flurry=temp/'flurry'
-            flurry.write_bytes(z.read(
-                'WeType.app/Contents/Frameworks/flurry.framework/Versions/A/flurry'))
-            wxp2p=temp/'WXP2PTransferDyn'
-            wxp2p.write_bytes(z.read(
-                'WeType.app/Contents/Frameworks/WXP2PTransferDyn.framework/Versions/A/WXP2PTransferDyn'))
             prefix='WeType.app/Contents/Resources/imeData.bundle/'
             for name in z.namelist():
                 if not name.startswith(prefix) or name.endswith('/'):continue
                 relative=name[len(prefix):]
                 if '/' in relative or relative in ('.','..'):raise ValueError('Unexpected resource path')
                 (resources/relative).write_bytes(z.read(name))
+        with zipfile.ZipFile(assets_archive) as z:
+            flurry=temp/'flurry'
+            flurry.write_bytes(z.read(
+                'WeType.app/Contents/Frameworks/flurry.framework/Versions/A/flurry'))
+            wxp2p=temp/'WXP2PTransferDyn'
+            wxp2p.write_bytes(z.read(
+                'WeType.app/Contents/Frameworks/WXP2PTransferDyn.framework/Versions/A/WXP2PTransferDyn'))
         if digest(original)!=ENGINE_SHA:raise ValueError('Engine SHA-256 mismatch')
         prepare=pathlib.Path(__file__).with_name('prepare_macos_runtime.py')
         if not prepare.exists():prepare=pathlib.Path(__file__).resolve().parent.parent/'tools/prepare_macos_runtime.py'
-        subprocess.run([sys.executable,str(prepare),str(original),str(runtime)],check=True)
+        subprocess.run([sys.executable,str(prepare),str(original),str(runtime),
+                        '--expected-sha256',ENGINE_SHA],check=True)
         subprocess.run([sys.executable,str(prepare),str(flurry),str(runtime/'flurry'),
                         '--expected-sha256',FLURRY_SHA,'--slide','0x103000000',
                         '--export-prefix','__ZN6flurry'],check=True)
@@ -324,7 +345,11 @@ def main():
             with (resources/name).open('rb') as f:
                 if stream_digest(f,'md5')!=row['md5']:raise ValueError('Dictionary digest mismatch: '+name)
         (runtime/'dicts.txt').write_text('\n'.join(f"{r['type']} {r['version']} {r['name']}" for r in rows if not r['is_cell'])+'\n')
-        (runtime/'runtime.json').write_text(json.dumps({'version':UPSTREAM_VERSION,'engine_sha256':ENGINE_SHA,'archive_sha256':ARCHIVE_SHA,'source':URL,'protocol':1},indent=2)+'\n')
+        (runtime/'runtime.json').write_text(json.dumps({
+            'version':UPSTREAM_VERSION,'engine_sha256':ENGINE_SHA,
+            'archive_sha256':ARCHIVE_SHA,'source':URL,
+            'assets_version':ASSETS_VERSION,'assets_archive_sha256':ASSETS_SHA,
+            'protocol':1},indent=2)+'\n')
         if target.exists():
             old=target.with_name(target.name+'.previous')
             if old.exists():shutil.rmtree(old)

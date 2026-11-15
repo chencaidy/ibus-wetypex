@@ -1,8 +1,8 @@
 # Maintainer: Caidy <https://github.com/chencaidy>
 
 pkgname=ibus-wetypex
-pkgver=2.2.3.657
-pkgrel=3
+pkgver=3.0.1.684
+pkgrel=1
 pkgdesc="Native Linux compatibility layer for WeType on IBus"
 arch=('x86_64')
 url="https://github.com/chencaidy/ibus-wetypex"

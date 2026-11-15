@@ -21,6 +21,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <malloc.h>
 #include <map>
 #include <memory>
@@ -54,6 +55,10 @@
 static std::map<std::string, uintptr_t> syms;
 static std::vector<std::pair<uintptr_t, std::string>> address_names;
 static std::vector<std::pair<uintptr_t, uintptr_t>> mapped_image_ranges;
+// Upstream client version advertised to the original core and its business
+// services. Overridden at startup from runtime.json, so one host build can
+// load any verified runtime instead of hard-coding a single upstream build.
+static std::string upstream_app_version = "3.0.1(684)";
 static uintptr_t tls_data = 0, tls_size = 0, tls_total = 0;
 static uintptr_t stack_guard = 0xa35197bd82e436c1ULL;
 static bool service_mode = false;
@@ -2917,6 +2922,28 @@ int main(int argc, char **argv) {
     return (flags & 3) == 3 && jsonReady ? 0 : 1;
   }
   std::string dir = argv[1], mode = argv[2], line;
+  {
+    // Derive the "3.0.1(684)" form used by wxime_initialize and the pairing
+    // protocol from the prepared runtime, instead of baking in one build.
+    std::ifstream metadata(dir + "/runtime.json");
+    if (metadata) {
+      const std::string text((std::istreambuf_iterator<char>(metadata)),
+                             std::istreambuf_iterator<char>());
+      const auto document = wire::parse(text);
+      const auto version = wire::str(document.get(), "version");
+      const auto build = version.rfind('.');
+      if (text.size() <= 16384 && !version.empty() && version.size() <= 64 &&
+          build != std::string::npos && build > 0 &&
+          build + 1 < version.size() &&
+          std::count(version.begin(), version.end(), '.') == 3 &&
+          version.find("..") == std::string::npos && version.front() != '.' &&
+          std::all_of(version.begin(), version.end(), [](char c) {
+            return (c >= '0' && c <= '9') || c == '.';
+          }))
+        upstream_app_version =
+            version.substr(0, build) + "(" + version.substr(build + 1) + ")";
+    }
+  }
   std::vector<std::string> binds, unwinds;
   std::vector<std::pair<uintptr_t, std::string>> ctors;
   auto loadModule = [&](const std::string &moduleDir) {
@@ -3169,7 +3196,7 @@ int main(int argc, char **argv) {
   // Account identity belongs to wxime_network_login.  The desktop init ABI
   // leaves this field empty; putting an account UIN here makes the core enter
   // its device-code generation path before network-login information exists.
-  setString(0x58, "2.2.3(657)");
+  setString(0x58, upstream_app_version.c_str());
   // The upstream protocol has no Linux platform enum, so use the original Mac
   // platform value while presenting an honest Linux device name.
   const char *device_name = getenv("WETYPE_DEVICE_MODEL");
