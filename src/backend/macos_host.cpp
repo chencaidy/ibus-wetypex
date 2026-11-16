@@ -333,9 +333,9 @@ public:
     emit_flurry_event("upload_done", task.file_path, task.file_size,
                       task.file_size, int(status), error);
   }
-  void OnUploadTaskProgress(const FlurryTaskInfo &task, size_t sent,
-                            size_t total) override {
-    emit_flurry_event("upload_progress", task.file_path, sent, total);
+  void OnUploadTaskProgress(const FlurryTaskInfo &task, size_t,
+                            size_t total_bytes_sent) override {
+    emit_flurry_event("upload_progress", task.file_path, total_bytes_sent, task.file_size);
   }
   void WillStartDownloadTasks(const FlurryTaskInfo *tasks,
                               size_t count) override {
@@ -347,9 +347,9 @@ public:
     emit_flurry_event("download_done", task.file_path, task.file_size,
                       task.file_size, int(status), error);
   }
-  void OnDownloadTaskProgress(const FlurryTaskInfo &task, size_t written,
-                              size_t total) override {
-    emit_flurry_event("download_progress", task.file_path, written, total);
+  void OnDownloadTaskProgress(const FlurryTaskInfo &task, size_t,
+                              size_t total_bytes_written) override {
+    emit_flurry_event("download_progress", task.file_path, total_bytes_written, task.file_size);
   }
   void OnMessage(const char *, size_t size) override {
     emit_flurry_event("message", nullptr, size, size);
@@ -387,9 +387,9 @@ public:
     emit_flurry_event("upload_done", task.file_path, task.file_size,
                       task.file_size, int(status), error);
   }
-  void OnUploadTaskProgress(const FlurryTaskInfo &task, size_t sent,
-                            size_t total) override {
-    emit_flurry_event("upload_progress", task.file_path, sent, total);
+  void OnUploadTaskProgress(const FlurryTaskInfo &task, size_t,
+                            size_t total_bytes_sent) override {
+    emit_flurry_event("upload_progress", task.file_path, total_bytes_sent, task.file_size);
   }
   void WillStartDownloadTasks(const FlurryTaskInfo *tasks,
                               size_t count) override {
@@ -401,9 +401,9 @@ public:
     emit_flurry_event("download_done", task.file_path, task.file_size,
                       task.file_size, int(status), error);
   }
-  void OnDownloadTaskProgress(const FlurryTaskInfo &task, size_t written,
-                              size_t total) override {
-    emit_flurry_event("download_progress", task.file_path, written, total);
+  void OnDownloadTaskProgress(const FlurryTaskInfo &task, size_t,
+                              size_t total_bytes_written) override {
+    emit_flurry_event("download_progress", task.file_path, total_bytes_written, task.file_size);
   }
   void OnMessage(const char *, size_t size) override {
     emit_flurry_event("message", nullptr, size, size);
