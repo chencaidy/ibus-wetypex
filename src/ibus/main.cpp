@@ -131,6 +131,19 @@ struct EngineState {
   bool singleQuoteLeft = true;
   bool backendReady = false;
   bool backendFailed = false;
+  // 语音输入最小接线：轮询 voice-inbox.json，final 时提交文本。
+  bool voiceActive = false;
+  bool voiceFinishing = false;
+  guint voiceSource = 0;
+  uint64_t voiceSequence = 0;
+  uint64_t voiceVersion = 0;
+  uint64_t voiceSession = 0;
+  uint64_t voiceEpoch = 0;
+  std::string voiceToken;
+  // Ctrl+空格语音（Windows 体验）：按住说话松手结束 / 短按免提按任意键结束。
+  bool voiceChordDown = false;
+  guint voiceChordSource = 0;
+  bool voiceHandsFree = false;
   bool selectionPending = false;
   bool renderedPreeditVisible = false;
   bool renderedPreeditInitialized = false;
@@ -833,10 +846,239 @@ void updateCursor(EngineState *state, size_t position) {
   updateUi(state);
 }
 
+// ---- 语音输入最小接线 -------------------------------------------------
+// 复用已安装的 voice_stream.py 服务：posix_spawn 发控制命令，按 120 ms
+// 轮询 state/voice-inbox.json，state=final 时把 text 提交到当前输入框。
+// 不依赖 Qt 窗口与设置界面；核心的 voice_engine_* 接口由宿主加载。
+static std::string voiceInboxPath() {
+  return (std::filesystem::path(g_get_user_data_dir()) / "wetypex" / "state" /
+          "voice-inbox.json").string();
+}
+
+static bool spawnVoiceControl(const std::vector<std::string> &args) {
+  const char *override = g_getenv("WETYPE_VOICE_LAUNCHER");
+  std::string launcher = override && *override ? override : WETYPE_VOICE_LAUNCHER;
+  std::vector<char *> argv{launcher.data()};
+  for (const auto &arg : args)
+    argv.push_back(const_cast<char *>(arg.c_str()));
+  argv.push_back(nullptr);
+  posix_spawn_file_actions_t actions;
+  posix_spawn_file_actions_init(&actions);
+  posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+  posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
+  posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+  pid_t pid = -1;
+  const int result = posix_spawn(&pid, launcher.c_str(), &actions, nullptr, argv.data(), environ);
+  posix_spawn_file_actions_destroy(&actions);
+  if (result != 0) {
+    g_warning("Unable to start WeTypeX voice control: %s", g_strerror(result));
+    return false;
+  }
+  g_child_watch_add(pid, [](GPid childPid, gint, gpointer) { g_spawn_close_pid(childPid); }, nullptr);
+  return true;
+}
+
+static void voiceAux(EngineState *state, const std::string &text) {
+  ibus_engine_update_auxiliary_text(IBUS_ENGINE(state->owner),
+                                    ibus_text_new_from_string(text.c_str()), !text.empty());
+}
+
+static void clearVoice(EngineState *state) {
+  if (state->voiceSource) {
+    g_source_remove(state->voiceSource);
+    state->voiceSource = 0;
+  }
+  if (state->voiceChordSource) {
+    g_source_remove(state->voiceChordSource);
+    state->voiceChordSource = 0;
+  }
+  state->voiceChordDown = false;
+  state->voiceHandsFree = false;
+  state->voiceActive = false;
+  state->voiceFinishing = false;
+  state->voiceToken.clear();
+  state->voiceVersion = 0;
+  voiceAux(state, "");
+}
+
+static gboolean voiceTick(gpointer data);
+
+static void startVoice(EngineState *state) {
+  if (state->voiceActive)
+    return;
+  state->voiceSession = state->session;
+  state->voiceEpoch = state->epoch;
+  // token 不含 '-'，避免 voice_stream.py 把它解析成 pid-seq 覆盖调用者 pid。
+  state->voiceToken = "v" + std::to_string(state->session) + "_" +
+                      std::to_string(state->epoch) + "_" +
+                      std::to_string(++state->voiceSequence);
+  state->voiceVersion = 0;
+  state->voiceActive = true;
+  state->voiceFinishing = false;
+  if (!spawnVoiceControl({"start", std::to_string(state->voiceSession),
+                          std::to_string(state->voiceEpoch), state->voiceToken, "0"})) {
+    clearVoice(state);
+    return;
+  }
+  voiceAux(state, "🎤 语音输入中…（再按一次结束）");
+  state->voiceSource = g_timeout_add(120, voiceTick, state);
+}
+
+static void cancelVoice(EngineState *state) {
+  if (state->voiceActive && !state->voiceToken.empty())
+    spawnVoiceControl({"cancel", state->voiceToken});
+  clearVoice(state);
+}
+
+static void toggleVoice(EngineState *state) {
+  if (!state->voiceActive) {
+    startVoice(state);
+    return;
+  }
+  if (!state->voiceFinishing) {
+    state->voiceFinishing = true;
+    spawnVoiceControl({"finish", state->voiceToken});
+    voiceAux(state, "🎤 识别中…");
+  } else {
+    cancelVoice(state);
+  }
+}
+
+static gboolean voiceTick(gpointer data) {
+  auto *state = static_cast<EngineState *>(data);
+  if (!state->voiceActive)
+    return FALSE;
+  std::ifstream file(voiceInboxPath());
+  if (!file)
+    return TRUE;
+  const std::string bytes((std::istreambuf_iterator<char>(file)),
+                          std::istreambuf_iterator<char>());
+  if (bytes.empty() || bytes.size() > 65536)
+    return TRUE;
+  wire::Json message(json_tokener_parse(bytes.c_str()));
+  if (!message)
+    return TRUE;
+  auto *root = message.get();
+  auto *token = wire::get(root, "token");
+  if (!token || std::string(json_object_get_string(token) ? json_object_get_string(token) : "") !=
+                    state->voiceToken)
+    return TRUE;
+  auto *version = wire::get(root, "version");
+  const uint64_t stamp = version ? static_cast<uint64_t>(json_object_get_int64(version)) : 0;
+  if (!stamp || stamp <= state->voiceVersion)
+    return TRUE;
+  state->voiceVersion = stamp;
+  auto *phaseValue = wire::get(root, "state");
+  const std::string phase = phaseValue && json_object_get_string(phaseValue)
+                                ? json_object_get_string(phaseValue) : "";
+  auto *textValue = wire::get(root, "text");
+  const std::string text = textValue && json_object_get_string(textValue)
+                               ? json_object_get_string(textValue) : "";
+  if (phase == "final") {
+    if (!text.empty())
+      ibus_engine_commit_text(IBUS_ENGINE(state->owner),
+                              ibus_text_new_from_string(text.c_str()));
+    state->voiceSource = 0;  // 返回 FALSE 时 GLib 会自动移除该 source
+    clearVoice(state);
+    return FALSE;
+  }
+  if (phase == "error" || phase == "cancelled") {
+    g_warning("WeTypeX voice input ended with state=%s: %s", phase.c_str(), text.c_str());
+    state->voiceSource = 0;
+    clearVoice(state);
+    return FALSE;
+  }
+  voiceAux(state, text.empty() ? "🎤 语音输入中…" : "🎤 " + text);
+  return TRUE;
+}
+
+// 按住 Ctrl+空格：按下即开始录音（不丢语音开头）。200 ms 内松手视为短按，
+// 转为免提模式；超过 200 ms 则松手即结束（Windows「按住说话」）。
+static gboolean voiceChordHold(gpointer data) {
+  auto *state = static_cast<EngineState *>(data);
+  state->voiceChordSource = 0;  // 定时器已触发 = 长按，松手要结束
+  return FALSE;
+}
+
+static void finishVoiceChord(EngineState *state) {
+  if (state->voiceActive && !state->voiceFinishing) {
+    state->voiceFinishing = true;
+    spawnVoiceControl({"finish", state->voiceToken});
+    voiceAux(state, "🎤 识别中…");
+  }
+}
+// ---- 语音输入最小接线结束 ---------------------------------------------
+
 gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
   const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
+
+  // ---- Ctrl+空格语音输入（与 Windows 微信输入法一致）----
+  // 按住说话：按住组合键一直输入，松手结束并自动上屏。
+  // 免提模式：短按（<200 ms）松手后保持录音，按任意键结束。
+  // 排除 CapsLock/NumLock 等锁定态位；组合键首键 Ctrl 为修饰键。
+  const guint chordMods =
+      cleanModifiers & ~(IBUS_LOCK_MASK | IBUS_MOD2_MASK | IBUS_HANDLED_MASK | IBUS_IGNORED_MASK);
+  const bool ctrlSpaceKey = keyval == IBUS_KEY_space &&
+      (chordMods & IBUS_CONTROL_MASK) != 0 && (chordMods & ~IBUS_CONTROL_MASK) == 0;
+
+  // 松开组合键中的任意一键即算「松手」：先松 Ctrl 还是先松空格都能结束。
+  // 只吞掉空格的 release，修饰键 release 必须放行，否则客户端修饰键状态会卡住。
+  if (release && state->voiceChordDown) {
+    const bool swallow = keyval == IBUS_KEY_space;
+    state->voiceChordDown = false;
+    if (state->voiceChordSource) {
+      g_source_remove(state->voiceChordSource);
+      state->voiceChordSource = 0;
+      state->voiceHandsFree = true;
+      voiceAux(state, "🎤 免提语音输入中…（按任意键结束）");
+    } else {
+      finishVoiceChord(state);
+    }
+    return swallow ? TRUE : FALSE;
+  }
+
+  // 免提模式：按任意键结束（该键被吞掉，与 Windows「按任意键均可结束」一致）。
+  if (!release && state->voiceHandsFree) {
+    finishVoiceChord(state);
+    state->voiceHandsFree = false;
+    return TRUE;
+  }
+
+  if (ctrlSpaceKey && !release) {
+    if (state->voiceChordDown)
+      return TRUE;  // 忽略按键重复
+    if (state->voiceActive) {  // 已在录音：再按一次结束（兼容切换式）
+      finishVoiceChord(state);
+      return TRUE;
+    }
+    // 有组合输入/候选/英文模式时不抢 Ctrl+空格，避免破坏正常输入。
+    if (!state->active || state->english || !state->preedit.empty() ||
+        !state->candidates.empty() || state->selectionPending)
+      return FALSE;
+    state->voiceChordDown = true;
+    state->voiceHandsFree = false;
+    startVoice(state);
+    if (!state->voiceActive) {  // 启动器 spawn 失败
+      state->voiceChordDown = false;
+      return TRUE;
+    }
+    voiceAux(state, "🎤 语音输入中…（松手结束）");
+    state->voiceChordSource = g_timeout_add(200, voiceChordHold, state);
+    return TRUE;
+  }
+  // ---- Ctrl+空格语音输入结束 ----
+
+  // 语音输入开关：Ctrl+Alt+V。必须放在 isCommandModifier 之前，
+  // 否则带修饰键的组合会被当作命令键直接放行给应用。
+  if ((keyval == IBUS_KEY_v || keyval == IBUS_KEY_V) &&
+      (cleanModifiers & (IBUS_CONTROL_MASK | IBUS_MOD1_MASK)) ==
+          (IBUS_CONTROL_MASK | IBUS_MOD1_MASK)) {
+    if (!release)
+      toggleVoice(state);
+    return TRUE;
+  }
 
   if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R || keyval == IBUS_KEY_Hyper_L ||
       keyval == IBUS_KEY_Hyper_R || keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
@@ -898,6 +1140,29 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
 
   if (release)
     return FALSE;
+
+  // 候选翻页：- / = 与 PageUp/PageDown 等价。
+  // 放在「拼音串非空」分支之外，云候选等 preedit 为空的场景同样能翻页；
+  // 有候选时一律吞掉这两个键，翻到边界也不放行，避免 "=" 直接上屏成等号；
+  // 没有候选时 - / = 仍作为普通字符输入。
+  const bool pagePrev = keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_minus;
+  const bool pageNext = keyval == IBUS_KEY_Page_Down || keyval == IBUS_KEY_equal;
+  if (pagePrev || pageNext) {
+    if (!state->candidates.empty()) {
+      const int pageCount = static_cast<int>(
+          (state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
+      const int nextPage = std::clamp(state->candidatePage + (pageNext ? 1 : -1), 0,
+                                      std::max(1, pageCount) - 1);
+      if (nextPage != state->candidatePage) {
+        state->candidatePage = nextPage;
+        state->candidateCursor = state->candidatePage * state->settings.pageSize;
+        updateUi(state);
+      }
+      return TRUE;
+    }
+    if (keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_Page_Down)
+      return TRUE;
+  }
 
   if (!state->preedit.empty()) {
     if (keyval == IBUS_KEY_Escape) {
@@ -970,18 +1235,6 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
       return TRUE;
     }
 
-    if (keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_Page_Down) {
-      const int pageCount =
-          static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
-      if (pageCount > 1) {
-        state->candidatePage =
-            std::clamp(state->candidatePage + (keyval == IBUS_KEY_Page_Down ? 1 : -1), 0, pageCount - 1);
-        state->candidateCursor = state->candidatePage * state->settings.pageSize;
-        updateUi(state);
-      }
-      return TRUE;
-    }
-
     if (keyval == IBUS_KEY_Up || keyval == IBUS_KEY_Down) {
       if (!state->candidates.empty()) {
         state->candidateCursor = std::clamp(state->candidateCursor + (keyval == IBUS_KEY_Down ? 1 : -1), 0,
@@ -1038,6 +1291,7 @@ void onFocusOut(IBusEngine *engine) {
   g_debug("onFocusOut");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->focused = false;
+  cancelVoice(self->state);
   activate(self->state);
 }
 
@@ -1053,12 +1307,14 @@ void onDisable(IBusEngine *engine) {
   g_debug("onDisable");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->enabled = false;
+  cancelVoice(self->state);
   activate(self->state);
 }
 
 void onReset(IBusEngine *engine) {
   g_debug("onReset");
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
+  cancelVoice(self->state);
   resetComposition(self->state, self->state->active);
 }
 
@@ -1186,6 +1442,7 @@ void finalize(GObject *object) {
       sendRequest(state, "close");
       usleep(10000);
     }
+    cancelVoice(state);
     closeBackend(state);
     if (state->properties)
       g_object_unref(state->properties);

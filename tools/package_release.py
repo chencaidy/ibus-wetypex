@@ -3,7 +3,7 @@
 import gzip,hashlib,pathlib,tarfile
 root=pathlib.Path(__file__).resolve().parent.parent
 output=root/'dist/arch';output.mkdir(parents=True,exist_ok=True)
-version='2.2.3.657';archive=output/f'ibus-wetypex-{version}.tar.gz'
+version='3.0.1.684';archive=output/f'ibus-wetypex-{version}.tar.gz'
 files=[]
 for name in ['CMakeLists.txt','README.md','LICENSE','NOTICE','CONTRIBUTING.md','SECURITY.md','.dockerignore','.editorconfig','.gitattributes','.gitignore','cmake','src','data','scripts','tools','packaging','docs']:
     p=root/name

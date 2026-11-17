@@ -33,7 +33,7 @@
 
 | 能力 | Linux 集成状态 |
 | --- | --- |
-| 全拼、双拼、五笔 | 使用原版 macOS 2.2.3.657 输入核心和词典 |
+| 全拼、双拼、五笔 | 使用原版 macOS 3.0.1.684 输入核心和词典；传输模块、界面资源与语音 VAD 仍取 2.2.3.657 |
 | 智能拼写与云候选 | 原版本地候选与桌面云候选合并，云端新增候选带 ☁ 标记 |
 | 微信表情 | 仅在可识别的微信客户端中推荐，候选显示用户安装包中的原图；普通 emoji 保留 |
 | IBus 原生输入体验 | GNOME原生集成，标准系统样式 |
@@ -75,7 +75,7 @@ WeTypeX IBus 引擎 ──────── 候选、预编辑、快捷键、�
 从 Release 界面下载对应发行版的最新版本：
 
 ```bash
-sudo apt install ./ibus-wetypex_2.2.3.657-3_amd64.deb
+sudo apt install ./ibus-wetypex_3.0.1.684-1_amd64.deb
 ```
 
 ### 从源码安装
@@ -96,10 +96,13 @@ sudo cmake --install build
 
 1. 使用已经下载的官方安装包：
 
-    固定版本的官方下载地址：[WeType_2.2.3_657.zip](https://download.weread.qq.com/app/wxkb/mac/2.2.3/WeType_2.2.3_657.zip)
+    固定版本的官方下载地址（**两个包都需要**）：
+    [WeType_3.0.1_684.zip](https://download.weread.qq.com/app/wxkb/mac/3.0.1/WeType_3.0.1_684.zip)（输入核心与词典）、
+    [WeType_2.2.3_657.zip](https://download.weread.qq.com/app/wxkb/mac/2.2.3/WeType_2.2.3_657.zip)（传输模块、界面资源与语音 VAD）。
 
     ```bash
-    wetypex-setup --archive /path/to/WeType_2.2.3_657.zip
+    wetypex-setup --archive /path/to/WeType_3.0.1_684.zip \
+                  --assets-archive /path/to/WeType_2.2.3_657.zip
     ```
 
 2. 明确接受上游许可后，从脚本内固定的腾讯地址下载：

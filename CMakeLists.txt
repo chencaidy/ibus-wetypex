@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(ibus-wetypex VERSION 2.2.3.657 LANGUAGES C CXX)
+project(ibus-wetypex VERSION 3.0.1.684 LANGUAGES C CXX)
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/PKGBUILD.in" WETYPE_PACKAGE_RELEASE_LINE REGEX "^pkgrel=[0-9]+$")
 string(REGEX REPLACE "^pkgrel=" "" WETYPE_PACKAGE_RELEASE "${WETYPE_PACKAGE_RELEASE_LINE}")
@@ -116,7 +116,8 @@ target_compile_definitions(ibus-engine-wetypex PRIVATE
   WETYPE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-backend"
   WETYPE_TRANSFER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-transfer"
   WETYPE_SETTINGS="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-settings"
-  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard")
+  WETYPE_SYNCD="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-clipboard"
+  WETYPE_VOICE_LAUNCHER="${CMAKE_INSTALL_FULL_BINDIR}/wetypex-voice")
 target_compile_options(ibus-engine-wetypex PRIVATE -Wall -Wextra)
 
 if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
@@ -178,7 +179,7 @@ configure_file(scripts/wetypex-account.sh.in wetypex-account @ONLY)
 # configure_file(scripts/wetypex-ai.sh.in wetypex-ai @ONLY)
 configure_file(scripts/wetypex-backend.sh.in wetypex-backend @ONLY)
 configure_file(scripts/wetypex-sync.sh.in wetypex-sync @ONLY)
-# configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
+configure_file(scripts/wetypex-voice.sh.in wetypex-voice @ONLY)
 configure_file(scripts/wetypex-setup.sh.in wetypex-setup @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wetypex-locale.so DESTINATION ${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME} RENAME locale.so)
@@ -197,7 +198,7 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-account DESTINATION ${CMAKE
 # install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-ai DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-backend DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-sync DESTINATION ${CMAKE_INSTALL_BINDIR})
-# install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-voice DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/wetypex-setup DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 install(PROGRAMS scripts/setup_runtime.py tools/prepare_macos_runtime.py DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
