@@ -1,4 +1,5 @@
 #include "../common/json.hpp"
+#include "constants.hpp"
 
 #include <fcntl.h>
 #include <glib-unix.h>
@@ -26,13 +27,14 @@ extern char **environ;
 
 namespace {
 
+using namespace ibus_engine::constants;
+
 struct Settings {
   std::string inputMode = "pinyin";
   std::string defaultLanguage = "chinese";
   int doublePinyinScheme = 0;
   int wubiSolution = 0;
   int pageSize = 5;
-  bool shiftSwitch = true;
   bool standalone = false;
   std::string punctuationMode = "auto";
   bool slashPunctuation = true;
@@ -48,25 +50,9 @@ struct Settings {
   bool wubiUniqueCommit = false;
   bool wubiNextCommit = false;
   bool wubiWildcardComment = false;
-  std::array<bool, 19> fuzzy{};
+  std::array<bool, shortcutKeys.size()> shortcuts{};
+  std::array<bool, fuzzyKeys.size()> fuzzy{};
 };
-
-struct PunctuationEntry {
-  char ascii;
-  const char *normal;
-  const char *english;
-  uint8_t pairType;
-};
-
-static constexpr std::array<PunctuationEntry, 32> kPunctuation = {{
-    {'!', "！", "!", 0}, {'"', "“”", "\"\"", 2}, {'#', "#", "#", 0},     {'$', "¥", "$", 0},     {'%', "%", "%", 0},
-    {'&', "&", "&", 0},  {'\'', "‘’", "''", 2},  {'(', "（）", "()", 1}, {')', "）", ")", 0},    {'*', "*", "*", 0},
-    {'+', "+", "+", 0},  {',', "，", ",", 0},    {'-', "-", "-", 0},     {'.', "。", ".", 0},    {'/', "/", "/", 0},
-    {':', "：", ":", 0}, {';', "；", ";", 0},    {'<', "《》", "<>", 1}, {'=', "=", "=", 0},     {'>', "》", ">", 0},
-    {'?', "？", "?", 0}, {'@', "@", "@", 0},     {'[', "【】", "[]", 1}, {'\\', "、", "\\", 0},  {']', "】", "]", 0},
-    {'^', "……", "^", 0}, {'_', "——", "_", 0},    {'`', "·", "`", 0},     {'{', "「」", "{}", 1}, {'|', "|", "|", 0},
-    {'}', "」", "}", 0}, {'~', "～", "~", 0},
-}};
 
 struct EngineState;
 
@@ -178,7 +164,6 @@ Settings readSettings() {
   settings.doublePinyinScheme = std::clamp(jsonInt(json.get(), "double_pinyin_scheme", 0), 0, 6);
   settings.wubiSolution = std::clamp(jsonInt(json.get(), "wubi_solution", 0), 0, 2);
   settings.pageSize = std::clamp(jsonInt(json.get(), "page_size", 5), 3, 9);
-  settings.shiftSwitch = jsonBool(json.get(), "shift_switch", true);
   settings.standalone = jsonBool(json.get(), "standalone", false);
   settings.punctuationMode = wire::str(json.get(), "punctuation_mode", "auto");
   settings.slashPunctuation = jsonBool(json.get(), "slash_punctuation", true);
@@ -194,13 +179,10 @@ Settings readSettings() {
   settings.wubiUniqueCommit = jsonBool(json.get(), "wubi_unique_commit", false);
   settings.wubiNextCommit = jsonBool(json.get(), "wubi_next_commit", false);
   settings.wubiWildcardComment = jsonBool(json.get(), "wubi_wildcard_comment", false);
-  constexpr std::array<const char *, 19> fuzzyKeys = {
-      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",     "fuzzy_gk",     "fuzzy_an_ang",
-      "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",   "fuzzy_s_sh",   "fuzzy_z_zh",
-      "fuzzy_hui_fei",  "fuzzy_en_eng",   "fuzzy_in_ing", "fuzzy_on_ong", "fuzzy_huang_wang",
-      "fuzzy_un_ong",   "fuzzy_un_iong",  "fuzzy_an_ai",  "fuzzy_eng_ong"};
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     settings.fuzzy[i] = jsonBool(json.get(), fuzzyKeys[i], false);
+  for (size_t i = 0; i < shortcutKeys.size(); ++i)
+    settings.shortcuts[i] = jsonBool(json.get(), shortcutKeys[i], i == kShortcutShiftSwitch);
   return settings;
 }
 
@@ -462,7 +444,6 @@ void queueLine(EngineState *state, const std::string &line) {
 void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "candidate_updates", true);
   wire::put(request, "keyboard", int64_t(settings.inputMode == "wubi" ? 5 : 0));
-  constexpr std::array<int, 7> doubleSchemes = {5, 1, 2, 3, 4, 6, 7};
   wire::put(request, "double_scheme",
             int64_t(settings.inputMode == "double_pinyin" ? doubleSchemes[settings.doublePinyinScheme] : 0));
   wire::put(request, "wubi_solution", int64_t(settings.wubiSolution));
@@ -477,14 +458,11 @@ void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "kaomoji", settings.kaomoji);
   wire::put(request, "large_emoji", false);
   wire::put(request, "symbol_emoji", settings.symbolEmoji);
-  wire::put(request, "v_mode", false);
-  constexpr std::array<const char *, 19> fuzzyKeys = {
-      "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",     "fuzzy_gk",     "fuzzy_an_ang",
-      "fuzzy_ian_iang", "fuzzy_uan_uang", "fuzzy_c_ch",   "fuzzy_s_sh",   "fuzzy_z_zh",
-      "fuzzy_hui_fei",  "fuzzy_en_eng",   "fuzzy_in_ing", "fuzzy_on_ong", "fuzzy_huang_wang",
-      "fuzzy_un_ong",   "fuzzy_un_iong",  "fuzzy_an_ai",  "fuzzy_eng_ong"};
+  wire::put(request, "v_mode", settings.shortcuts[kShortcutVMode]);
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     wire::put(request, fuzzyKeys[i], settings.fuzzy[i]);
+  for (size_t i = 0; i < shortcutKeys.size(); ++i)
+    wire::put(request, shortcutKeys[i], settings.shortcuts[i]);
 }
 
 bool sendRequest(EngineState *state, const char *operation, const std::string &key = "", int index = 0,
@@ -735,12 +713,6 @@ void activate(EngineState *state) {
   }
 }
 
-bool isCommandModifier(guint modifiers) {
-  constexpr guint mask = IBUS_CONTROL_MASK | IBUS_MOD1_MASK | IBUS_MOD3_MASK | IBUS_MOD4_MASK | IBUS_MOD5_MASK |
-                         IBUS_SUPER_MASK | IBUS_HYPER_MASK | IBUS_META_MASK;
-  return (modifiers & mask) != 0;
-}
-
 bool splitPunctuationPair(const std::string &text, std::string &left, std::string &right) {
   if (g_utf8_strlen(text.c_str(), -1) != 2)
     return false;
@@ -840,7 +812,7 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
 
   if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R || keyval == IBUS_KEY_Hyper_L ||
       keyval == IBUS_KEY_Hyper_R || keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
-      isCommandModifier(cleanModifiers)) {
+      (modifiers & kCommandModifierMask) != 0) {
     // A modifier chord disarms the bare-Shift tap, like ascii_composer's
     // multi-modifier guard.
     state->shiftCandidate = false;
@@ -857,7 +829,7 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
     if (release) {
       state->pressedShifts &= static_cast<uint8_t>(~bit);
       const bool switchMode = state->pressedShifts == 0 && state->active && state->shiftCandidate &&
-                              !state->shiftWasUsed && state->settings.shiftSwitch &&
+                              !state->shiftWasUsed && state->settings.shortcuts[kShortcutShiftSwitch] &&
                               // librime's ascii_composer only treats a Shift press-release pair
                               // within 500 ms as a tap; a held Shift means it was used as a
                               // modifier (Shift+click), so it must not toggle the language.
@@ -871,7 +843,7 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
       return FALSE;
     }
     state->pressedShifts |= bit;
-    state->shiftCandidate = state->active && state->settings.shiftSwitch;
+    state->shiftCandidate = state->active && state->settings.shortcuts[kShortcutShiftSwitch];
     state->shiftWasUsed = false;
     state->shiftPressedAt = g_get_monotonic_time();
     return FALSE;
