@@ -951,9 +951,6 @@ GtkWidget *build_input_page() {
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
                             string_combo_row(kDefaultLanguageTitle, nullptr, "default_language", kDefaultLanguageLabels,
                                              {"chinese", "english"}, language == "english" ? 1 : 0));
-  adw_preferences_group_add(
-      ADW_PREFERENCES_GROUP(behavior_group),
-      switch_row(kShiftSwitchTitle, nullptr, "shift_switch", setting_bool(settings.get(), "shift_switch", true)));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
                             switch_row(kSmartInputTitle, kSmartInputSubtitle, "smart_input",
                                        setting_bool(settings.get(), "smart_input", true)));
@@ -966,7 +963,7 @@ GtkWidget *build_input_page() {
                             string_combo_row(kChinesePunctuationTitle, kChinesePunctuationSubtitle, "punctuation_mode",
                                              kPunctuationModes, {"auto", "fullwidth", "halfwidth"}, punctuation_index));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
-                            switch_row(kSlashPunctuationTitle, kSlashPunctuationSubtitle, "slash_punctuation",
+                            switch_row(kSlashPunctuationTitle, nullptr, "slash_punctuation",
                                        setting_bool(settings.get(), "slash_punctuation", true)));
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(behavior_group),
                             switch_row(kStandaloneTitle, kStandaloneSubtitle, "standalone",
@@ -1020,6 +1017,76 @@ GtkWidget *build_input_page() {
   adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(advanced_group));
 
   update_mode_sensitivity(mode);
+  return page;
+}
+
+GtkWidget *build_shortcuts_page() {
+  auto settings = read_settings();
+  GtkWidget *page = adw_preferences_page_new();
+
+  GtkWidget *language_group = make_group(kGroupLanguageSwitch);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(language_group),
+                            switch_row(kUseShiftTitle, nullptr, "shortcut_shift_switch",
+                                       setting_bool(settings.get(), "shortcut_shift_switch", true)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(language_group),
+                            switch_row(kUseCtrlTitle, nullptr, "shortcut_ctrl_switch",
+                                       setting_bool(settings.get(), "shortcut_ctrl_switch", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(language_group));
+
+  // GtkWidget *quick_actions_group = make_group(kGroupQuickActions);
+  // adw_preferences_group_add(ADW_PREFERENCES_GROUP(quick_actions_group),
+  //                           switch_row(kAiAssistantTitle, kAiAssistantSubtitle, "shortcut_ai_assistant",
+  //                                      setting_bool(settings.get(), "shortcut_ai_assistant", false)));
+  // adw_preferences_group_add(ADW_PREFERENCES_GROUP(quick_actions_group),
+  //                           switch_row(kVModeTitle, kVModeSubtitle, "shortcut_v_mode",
+  //                                      setting_bool(settings.get(), "shortcut_v_mode", false)));
+  // adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(quick_actions_group));
+
+  // GtkWidget *voice_group = make_group(kGroupVoiceInput);
+  // adw_preferences_group_add(ADW_PREFERENCES_GROUP(voice_group),
+  //                           switch_row(kVoiceInputTitle, kVoiceInputSubtitle, "shortcut_voice_input",
+  //                                      setting_bool(settings.get(), "shortcut_voice_input", false)));
+  // adw_preferences_group_add(ADW_PREFERENCES_GROUP(voice_group),
+  //                           switch_row(kVoiceHoldTitle, kVoiceHoldSubtitle, "shortcut_voice_hold_to_talk",
+  //                                      setting_bool(settings.get(), "shortcut_voice_hold_to_talk", false)));
+  // adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(voice_group));
+
+  GtkWidget *input_state_group = make_group(kGroupInputState);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(input_state_group),
+                            switch_row(kFullHalfSwitchTitle, nullptr, "shortcut_full_half_switch",
+                                       setting_bool(settings.get(), "shortcut_full_half_switch", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(input_state_group),
+                            switch_row(kPunctuationSwitchTitle, nullptr, "shortcut_punctuation_switch",
+                                       setting_bool(settings.get(), "shortcut_punctuation_switch", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(input_state_group),
+                            switch_row(kTraditionalSwitchTitle, nullptr, "shortcut_traditional_switch",
+                                       setting_bool(settings.get(), "shortcut_traditional_switch", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(input_state_group));
+
+  GtkWidget *page_candidates_group = make_group(kGroupPageCandidates);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(page_candidates_group),
+                            switch_row(kPageMinusEqualTitle, nullptr, "shortcut_page_minus_equal",
+                                       setting_bool(settings.get(), "shortcut_page_minus_equal", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(page_candidates_group),
+                            switch_row(kPageBracketsTitle, nullptr, "shortcut_page_brackets",
+                                       setting_bool(settings.get(), "shortcut_page_brackets", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(page_candidates_group),
+                            switch_row(kPageCommaPeriodTitle, nullptr, "shortcut_page_comma_period",
+                                       setting_bool(settings.get(), "shortcut_page_comma_period", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(page_candidates_group),
+                            switch_row(kPageShiftTabTitle, nullptr, "shortcut_page_shift_tab",
+                                       setting_bool(settings.get(), "shortcut_page_shift_tab", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(page_candidates_group));
+
+  GtkWidget *candidate_selection_group = make_group(kGroupCandidateSelection);
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_selection_group),
+                            switch_row(kCandidateSemicolonQuoteTitle, nullptr, "shortcut_candidate_semicolon_quote",
+                                       setting_bool(settings.get(), "shortcut_candidate_semicolon_quote", false)));
+  adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_selection_group),
+                            switch_row(kCandidateCtrlTitle, nullptr, "shortcut_candidate_ctrl",
+                                       setting_bool(settings.get(), "shortcut_candidate_ctrl", false)));
+  adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(candidate_selection_group));
+
   return page;
 }
 
@@ -1155,6 +1222,7 @@ GtkWidget *create_window() {
   const PageInfo pages[] = {
       {"input", kPageInputTitle, "input-keyboard-symbolic", build_input_page},
       {"phrases", kPagePhrasesTitle, "user-bookmarks-symbolic", build_phrases_page},
+      {"shortcuts", kPageShortcutsTitle, "tag-symbolic", build_shortcuts_page},
       {"devices", kPageDevicesTitle, "network-workgroup-symbolic", build_devices_page},
       {"about", kPageAboutTitle, "help-about-symbolic", build_about_page},
   };
