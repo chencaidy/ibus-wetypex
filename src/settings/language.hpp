@@ -20,6 +20,7 @@ inline constexpr const char *kIssues = "https://github.com/chencaidy/ibus-wetype
 // ---- 页面标题 ----
 inline constexpr const char *kPageInputTitle = "输入";
 inline constexpr const char *kPagePhrasesTitle = "常用语";
+inline constexpr const char *kPageShortcutsTitle = "快捷键";
 inline constexpr const char *kPageDevicesTitle = "跨设备";
 inline constexpr const char *kPageAboutTitle = "关于";
 
@@ -44,7 +45,6 @@ inline constexpr const char *kVerticalCandidatesSubtitle = "使用垂直排列�
 inline constexpr const char *kGroupBehavior = "输入行为";
 inline constexpr const char *kDefaultLanguageTitle = "默认输入语言";
 inline const std::vector<std::string> kDefaultLanguageLabels = {"中文", "英文"};
-inline constexpr const char *kShiftSwitchTitle = "使用 Shift 切换中英文";
 inline constexpr const char *kSmartInputTitle = "智能拼写";
 inline constexpr const char *kSmartInputSubtitle = "启用原版智能纠错和候选";
 inline constexpr const char *kEmojiRecommendTitle = "表情和颜文字推荐";
@@ -52,8 +52,7 @@ inline constexpr const char *kEmojiRecommendSubtitle = "在候选中推荐表情
 inline constexpr const char *kChinesePunctuationTitle = "中文标点";
 inline constexpr const char *kChinesePunctuationSubtitle = "自动根据光标前字符切换，或固定使用全角/半角标点";
 inline const std::vector<std::string> kPunctuationModes = {"自动", "全角", "半角"};
-inline constexpr const char *kSlashPunctuationTitle = "将「/?」替换为 、";
-inline constexpr const char *kSlashPunctuationSubtitle = "输入斜杠时输出顿号";
+inline constexpr const char *kSlashPunctuationTitle = "输入中文时，将「/?」替换为 、";
 inline constexpr const char *kStandaloneTitle = "单机模式";
 inline constexpr const char *kStandaloneSubtitle = "云输入/跨设备同步等功能将不可用";
 
@@ -109,6 +108,38 @@ inline constexpr const char *kPhraseSaving = "正在保存";
 inline constexpr const char *kPhraseSaveFailed = "保存失败";
 inline constexpr const char *kPhraseEmptyTitle = "暂无常用语";
 inline constexpr const char *kPhraseEmptySubtitle = "点击右上角添加";
+
+// ---- 快捷键页 ----
+inline constexpr const char *kGroupLanguageSwitch = "中英文切换";
+inline constexpr const char *kUseShiftTitle = "使用「Shift」";
+inline constexpr const char *kUseCtrlTitle = "使用「Ctrl」";
+
+inline constexpr const char *kGroupQuickActions = "快捷使用";
+inline constexpr const char *kAiAssistantTitle = "AI 助手";
+inline constexpr const char *kAiAssistantSubtitle = "输入后按「=」可使用 AI 提问、表情推荐等功能";
+inline constexpr const char *kVModeTitle = "V 模式";
+inline constexpr const char *kVModeSubtitle = "按「v」打开快捷功能栏，可使用计算、剪贴板、常用语、符号等功能";
+
+inline constexpr const char *kGroupVoiceInput = "语音输入";
+inline constexpr const char *kVoiceInputTitle = "启动语音输入";
+inline constexpr const char *kVoiceInputSubtitle = "按下可开启语音输入，再次按快捷键或 Enter 结束";
+inline constexpr const char *kVoiceHoldTitle = "按住说话";
+inline constexpr const char *kVoiceHoldSubtitle = "按住可语音输入，松手结束";
+
+inline constexpr const char *kGroupInputState = "输入状态切换";
+inline constexpr const char *kFullHalfSwitchTitle = "全半角输入切换「Shift + 空格」";
+inline constexpr const char *kPunctuationSwitchTitle = "中文下中英标点切换「Ctrl + 。」";
+inline constexpr const char *kTraditionalSwitchTitle = "简繁体输入切换「Ctrl + Shift + F」";
+
+inline constexpr const char *kGroupPageCandidates = "翻页找字";
+inline constexpr const char *kPageMinusEqualTitle = "减号等号";
+inline constexpr const char *kPageBracketsTitle = "左右中括号";
+inline constexpr const char *kPageCommaPeriodTitle = "逗号句号";
+inline constexpr const char *kPageShiftTabTitle = "Shift + Tab / Tab";
+
+inline constexpr const char *kGroupCandidateSelection = "候选词选择";
+inline constexpr const char *kCandidateSemicolonQuoteTitle = "使用分号、引号选择第 2 位、第 3 位候选词";
+inline constexpr const char *kCandidateCtrlTitle = "使用左、右 Ctrl 选择第 2 位、第 3 位候选词";
 
 // ---- 跨设备页 ----
 inline constexpr const char *kDevicesGroupTitle = "跨设备";
