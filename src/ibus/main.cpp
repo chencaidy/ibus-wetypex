@@ -36,6 +36,7 @@ struct Settings {
   int wubiSolution = 0;
   int pageSize = 5;
   bool standalone = false;
+  bool fullWidth = false;
   bool traditional = false;
   bool chinesePunctuation = true;
   bool slashPunctuation = true;
@@ -110,7 +111,6 @@ struct EngineState {
   bool enabled = false;
   bool active = false;
   bool english = false;
-  bool fullWidth = false;
   bool fullHalfShortcutDown = false;
   bool punctuationShortcutDown = false;
   bool traditionalShortcutDown = false;
@@ -132,11 +132,6 @@ struct EngineState {
 uint64_t nextSession = 0;
 bool sharedEnglishMode = false;
 bool sharedModeInitialized = false;
-bool sharedFullWidthMode = false;
-bool sharedTraditionalMode = false;
-bool sharedChinesePunctuationMode = true;
-bool sharedChinesePunctuationConfig = true;
-bool sharedChinesePunctuationInitialized = false;
 pid_t syncPid = -1;
 guint syncWatch = 0;
 
@@ -156,7 +151,7 @@ int jsonInt(json_object *object, const char *key, int fallback) {
 
 Settings readSettings() {
   Settings settings;
-  const std::filesystem::path path = std::filesystem::path(g_get_user_config_dir()) / "ibus/wetypex/wetypex.json";
+  const std::filesystem::path path = configPath();
   std::ifstream file(path);
   if (!file)
     return settings;
@@ -176,6 +171,8 @@ Settings readSettings() {
   settings.wubiSolution = std::clamp(jsonInt(json.get(), "wubi_solution", 0), 0, 2);
   settings.pageSize = std::clamp(jsonInt(json.get(), "page_size", 5), 3, 9);
   settings.standalone = jsonBool(json.get(), "standalone", false);
+  settings.fullWidth = jsonBool(json.get(), "full_width", false);
+  settings.traditional = jsonBool(json.get(), "traditional", false);
   settings.chinesePunctuation = jsonBool(json.get(), "chinese_punctuation", true);
   settings.slashPunctuation = jsonBool(json.get(), "slash_punctuation", true);
   settings.vertical = jsonBool(json.get(), "vertical", false);
@@ -195,6 +192,50 @@ Settings readSettings() {
   for (size_t i = 0; i < shortcutKeys.size(); ++i)
     settings.shortcuts[i] = jsonBool(json.get(), shortcutKeys[i], i == kShortcutShiftSwitch);
   return settings;
+}
+
+bool saveSettings(const Settings &settings) {
+  const std::filesystem::path path = configPath();
+  auto json = wire::object();
+  if (g_file_test(path.c_str(), G_FILE_TEST_EXISTS)) {
+    std::ifstream file(path);
+    if (!file) {
+      g_warning("Unable to read WeTypeX settings at %s before updating", path.c_str());
+      return false;
+    }
+    std::string contents((std::istreambuf_iterator<char>(file)), {});
+    json = wire::parse(contents);
+    if (!json || !json_object_is_type(json.get(), json_type_object)) {
+      g_warning("Unable to update invalid WeTypeX settings at %s", path.c_str());
+      return false;
+    }
+  }
+
+  wire::put(json.get(), "full_width", settings.fullWidth);
+  wire::put(json.get(), "traditional", settings.traditional);
+  wire::put(json.get(), "chinese_punctuation", settings.chinesePunctuation);
+
+  const auto directory = path.parent_path().string();
+  if (g_mkdir_with_parents(directory.c_str(), 0755) != 0) {
+    g_warning("Unable to create WeTypeX settings directory %s: %s", directory.c_str(), g_strerror(errno));
+    return false;
+  }
+  const char *text = json_object_to_json_string_ext(json.get(), JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED);
+  if (!text) {
+    g_warning("Unable to serialize WeTypeX settings");
+    return false;
+  }
+  std::string contents(text);
+  contents.push_back('\n');
+  GError *error = nullptr;
+  const bool saved = g_file_set_contents_full(
+      path.c_str(), contents.data(), static_cast<gssize>(contents.size()),
+      static_cast<GFileSetContentsFlags>(G_FILE_SET_CONTENTS_CONSISTENT | G_FILE_SET_CONTENTS_DURABLE), 0644, &error);
+  if (!saved) {
+    g_warning("Unable to write %s: %s", path.c_str(), error ? error->message : "unknown error");
+    g_clear_error(&error);
+  }
+  return saved;
 }
 
 void clearUi(EngineState *state) {
@@ -441,14 +482,6 @@ void restartBackend(EngineState *state) {
   closeBackend(state);
   state->backendFailed = false;
   state->settings = readSettings();
-  if (!sharedChinesePunctuationInitialized || state->settings.chinesePunctuation != sharedChinesePunctuationConfig) {
-    sharedChinesePunctuationConfig = state->settings.chinesePunctuation;
-    sharedChinesePunctuationMode = sharedChinesePunctuationConfig;
-    sharedChinesePunctuationInitialized = true;
-  }
-  state->settings.chinesePunctuation = sharedChinesePunctuationMode;
-  state->settings.traditional = sharedTraditionalMode;
-  state->fullWidth = sharedFullWidthMode;
   updateUi(state);
 }
 
@@ -693,14 +726,6 @@ void activate(EngineState *state) {
   state->active = active;
   if (active) {
     state->settings = readSettings();
-    if (!sharedChinesePunctuationInitialized || state->settings.chinesePunctuation != sharedChinesePunctuationConfig) {
-      sharedChinesePunctuationConfig = state->settings.chinesePunctuation;
-      sharedChinesePunctuationMode = sharedChinesePunctuationConfig;
-      sharedChinesePunctuationInitialized = true;
-    }
-    state->settings.chinesePunctuation = sharedChinesePunctuationMode;
-    state->settings.traditional = sharedTraditionalMode;
-    state->fullWidth = sharedFullWidthMode;
     if (!sharedModeInitialized) {
       sharedEnglishMode = state->settings.defaultLanguage == "english";
       sharedModeInitialized = true;
@@ -777,7 +802,7 @@ bool processPunctuation(EngineState *state, gunichar unicode) {
     }
   } else {
     mapped = it->english;
-    if (state->fullWidth)
+    if (state->settings.fullWidth)
       mapped = fullWidthAscii(mapped);
   }
 
@@ -908,7 +933,7 @@ bool commitFullWidthAscii(IBusEngine *engine, gunichar unicode) {
 void toggleTraditionalMode(EngineState *state) {
   auto *engine = IBUS_ENGINE(state->owner);
   state->settings.traditional = !state->settings.traditional;
-  sharedTraditionalMode = state->settings.traditional;
+  saveSettings(state->settings);
   if (!state->preedit.empty())
     ibus_engine_commit_text(engine, ibus_text_new_from_string(state->preedit.c_str()));
   resetComposition(state, false);
@@ -937,8 +962,8 @@ bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers
         (cleanModifiers & (IBUS_CONTROL_MASK | otherCommandModifiers)) == 0 &&
         state->settings.shortcuts[kShortcutFullHalfSwitch]) {
       if (!state->fullHalfShortcutDown) {
-        state->fullWidth = !state->fullWidth;
-        sharedFullWidthMode = state->fullWidth;
+        state->settings.fullWidth = !state->settings.fullWidth;
+        saveSettings(state->settings);
       }
       state->fullHalfShortcutDown = true;
       return true;
@@ -957,7 +982,7 @@ bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers
         state->settings.shortcuts[kShortcutPunctuationSwitch]) {
       if (!state->punctuationShortcutDown) {
         state->settings.chinesePunctuation = !state->settings.chinesePunctuation;
-        sharedChinesePunctuationMode = state->settings.chinesePunctuation;
+        saveSettings(state->settings);
       }
       state->punctuationShortcutDown = true;
       return true;
@@ -1120,12 +1145,12 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
   const bool separator = unicode == '\'' && !state->preedit.empty() && state->settings.inputMode != "wubi";
 
   if (state->english) {
-    if (state->fullWidth && commitFullWidthAscii(engine, unicode))
+    if (state->settings.fullWidth && commitFullWidthAscii(engine, unicode))
       return TRUE;
     return FALSE;
   }
 
-  if (state->fullWidth && state->preedit.empty() && (unicode == ' ' || (unicode >= '0' && unicode <= '9')) &&
+  if (state->settings.fullWidth && state->preedit.empty() && (unicode == ' ' || (unicode >= '0' && unicode <= '9')) &&
       commitFullWidthAscii(engine, unicode))
     return TRUE;
 
