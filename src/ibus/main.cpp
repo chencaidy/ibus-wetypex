@@ -110,9 +110,11 @@ struct EngineState {
   bool active = false;
   bool english = false;
   bool shiftCandidate = false;
-  bool shiftWasUsed = false;
   uint8_t pressedShifts = 0;
   int64_t shiftPressedAt = 0;
+  bool ctrlCandidate = false;
+  uint8_t pressedCtrls = 0;
+  int64_t ctrlPressedAt = 0;
   bool doubleQuoteLeft = true;
   bool singleQuoteLeft = true;
   bool backendReady = false;
@@ -585,8 +587,9 @@ void resetComposition(EngineState *state, bool sendReset) {
   state->selectionPending = false;
   state->deferredKeys.clear();
   state->shiftCandidate = false;
-  state->shiftWasUsed = false;
   state->pressedShifts = 0;
+  state->ctrlCandidate = false;
+  state->pressedCtrls = 0;
   clearUi(state);
   if (sendReset)
     sendRequest(state, "reset");
@@ -657,7 +660,7 @@ void setEnglishMode(EngineState *state, bool english) {
   }
   state->english = english;
   state->shiftCandidate = false;
-  state->shiftWasUsed = false;
+  state->ctrlCandidate = false;
   state->candidates.clear();
   state->cloud.clear();
   updateUi(state);
@@ -805,55 +808,67 @@ void updateCursor(EngineState *state, size_t position) {
   updateUi(state);
 }
 
+bool processLanguageSwitchKey(IBusEngine *engine, guint keyval, guint modifiers) {
+  auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
+  const bool isShift = keyval == IBUS_KEY_Shift_L || keyval == IBUS_KEY_Shift_R;
+  const bool isCtrl = keyval == IBUS_KEY_Control_L || keyval == IBUS_KEY_Control_R;
+  const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
+  const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
+
+  if (!isShift && !isCtrl) {
+    if (!release) {
+      state->shiftCandidate = false;
+      state->ctrlCandidate = false;
+    }
+    return false;
+  }
+
+  const bool *enabled = &state->settings.shortcuts[isShift ? kShortcutShiftSwitch : kShortcutCtrlSwitch];
+  bool &candidate = isShift ? state->shiftCandidate : state->ctrlCandidate;
+  bool &otherCandidate = isShift ? state->ctrlCandidate : state->shiftCandidate;
+  uint8_t &pressed = isShift ? state->pressedShifts : state->pressedCtrls;
+  uint8_t &otherPressed = isShift ? state->pressedCtrls : state->pressedShifts;
+  int64_t &pressedAt = isShift ? state->shiftPressedAt : state->ctrlPressedAt;
+  const guint ownModifier = isShift ? IBUS_SHIFT_MASK : IBUS_CONTROL_MASK;
+  const guint otherModifierMask = (kCommandModifierMask | IBUS_SHIFT_MASK) & ~ownModifier;
+  const uint8_t bit = keyval == (isShift ? IBUS_KEY_Shift_L : IBUS_KEY_Control_L) ? 1 : 2;
+
+  if (release) {
+    pressed &= static_cast<uint8_t>(~bit);
+    const bool otherModifier = pressed != 0 || otherPressed != 0 || (cleanModifiers & otherModifierMask) != 0;
+    const bool switchMode =
+        state->active && candidate && *enabled && !otherModifier && g_get_monotonic_time() - pressedAt <= 500000;
+    candidate = false;
+    if (switchMode) {
+      setEnglishMode(state, !state->english);
+      updateModeProperty(state);
+      g_debug_func("Toggle language");
+    }
+    return true;
+  }
+
+  otherCandidate = false;
+  const bool otherModifier = pressed != 0 || otherPressed != 0 || (cleanModifiers & otherModifierMask) != 0;
+  candidate = state->active && *enabled && !otherModifier;
+  pressed |= bit;
+  pressedAt = g_get_monotonic_time();
+  return true;
+}
+
 gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
   const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
 
+  // g_debug_func("keyval=%d modifiers=0x%08x", keyval, modifiers);
+
+  if (processLanguageSwitchKey(engine, keyval, modifiers))
+    return FALSE;
+
   if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R || keyval == IBUS_KEY_Hyper_L ||
       keyval == IBUS_KEY_Hyper_R || keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
       (modifiers & kCommandModifierMask) != 0) {
-    // A modifier chord disarms the bare-Shift tap, like ascii_composer's
-    // multi-modifier guard.
-    state->shiftCandidate = false;
-    state->shiftWasUsed = false;
     return FALSE;
-  }
-
-  // Shift is only an input-method gesture when it is pressed and released on
-  // its own, but it is never consumed: clients track modifier state from the
-  // keys they receive, so swallowing the press/release pair makes Shift+click
-  // lose the selection and leaves the client one modifier event behind.
-  if (keyval == IBUS_KEY_Shift_L || keyval == IBUS_KEY_Shift_R) {
-    const uint8_t bit = keyval == IBUS_KEY_Shift_L ? 1 : 2;
-    if (release) {
-      state->pressedShifts &= static_cast<uint8_t>(~bit);
-      const bool switchMode = state->pressedShifts == 0 && state->active && state->shiftCandidate &&
-                              !state->shiftWasUsed && state->settings.shortcuts[kShortcutShiftSwitch] &&
-                              // librime's ascii_composer only treats a Shift press-release pair
-                              // within 500 ms as a tap; a held Shift means it was used as a
-                              // modifier (Shift+click), so it must not toggle the language.
-                              g_get_monotonic_time() - state->shiftPressedAt <= 500000;
-      state->shiftCandidate = false;
-      state->shiftWasUsed = false;
-      if (switchMode) {
-        setEnglishMode(state, !state->english);
-        updateModeProperty(state);
-      }
-      return FALSE;
-    }
-    state->pressedShifts |= bit;
-    state->shiftCandidate = state->active && state->settings.shortcuts[kShortcutShiftSwitch];
-    state->shiftWasUsed = false;
-    state->shiftPressedAt = g_get_monotonic_time();
-    return FALSE;
-  }
-
-  // Any other key invalidates a pending bare-Shift switch, including keys that
-  // are buffered while a candidate selection reply is outstanding.
-  if (!release && state->shiftCandidate) {
-    state->shiftWasUsed = true;
-    state->shiftCandidate = false;
   }
 
   if (state->selectionPending && keyval != IBUS_KEY_Escape) {
