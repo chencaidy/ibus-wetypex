@@ -36,7 +36,7 @@ struct Settings {
   int wubiSolution = 0;
   int pageSize = 5;
   bool standalone = false;
-  std::string punctuationMode = "auto";
+  bool chinesePunctuation = true;
   bool slashPunctuation = true;
   bool vertical = false;
   bool smartInput = true;
@@ -122,7 +122,6 @@ struct EngineState {
   bool selectionPending = false;
   bool renderedPreeditVisible = false;
   bool renderedPreeditInitialized = false;
-  bool isCursorBehindAscii = false;
 };
 
 uint64_t nextSession = 0;
@@ -167,7 +166,7 @@ Settings readSettings() {
   settings.wubiSolution = std::clamp(jsonInt(json.get(), "wubi_solution", 0), 0, 2);
   settings.pageSize = std::clamp(jsonInt(json.get(), "page_size", 5), 3, 9);
   settings.standalone = jsonBool(json.get(), "standalone", false);
-  settings.punctuationMode = wire::str(json.get(), "punctuation_mode", "auto");
+  settings.chinesePunctuation = jsonBool(json.get(), "chinese_punctuation", true);
   settings.slashPunctuation = jsonBool(json.get(), "slash_punctuation", true);
   settings.vertical = jsonBool(json.get(), "vertical", false);
   settings.smartInput = jsonBool(json.get(), "smart_input", true);
@@ -461,6 +460,7 @@ void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "large_emoji", false);
   wire::put(request, "symbol_emoji", settings.symbolEmoji);
   wire::put(request, "v_mode", settings.shortcuts[kShortcutVMode]);
+  wire::put(request, "chinese_punctuation", settings.chinesePunctuation);
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     wire::put(request, fuzzyKeys[i], settings.fuzzy[i]);
   for (size_t i = 0; i < shortcutKeys.size(); ++i)
@@ -480,9 +480,6 @@ bool sendRequest(EngineState *state, const char *operation, const std::string &k
   wire::put(request.get(), "index", int64_t(index));
   wire::put(request.get(), "revision", revision);
   wire::put(request.get(), "cursor", cursor);
-  const bool chinesePunctuation = state->settings.punctuationMode == "fullwidth" ||
-                                  (state->settings.punctuationMode == "auto" && !state->isCursorBehindAscii);
-  wire::put(request.get(), "chinese_punctuation", int64_t(chinesePunctuation));
   wire::put(request.get(), "mapped", mapped);
   putSettings(request.get(), state->settings);
   const std::string line = wire::dump(request.get());
@@ -740,9 +737,7 @@ bool processPunctuation(EngineState *state, gunichar unicode) {
   std::string left;
   std::string right;
 
-  const bool chinesePunctuation = state->settings.punctuationMode == "fullwidth" ||
-                                  (state->settings.punctuationMode == "auto" && !state->isCursorBehindAscii);
-  if (chinesePunctuation) {
+  if (state->settings.chinesePunctuation) {
     if (ascii == '/' && state->settings.slashPunctuation) {
       mapped = "、";
     } else {
@@ -1030,7 +1025,6 @@ void onFocusOut(IBusEngine *engine) {
 
 void onEnable(IBusEngine *engine) {
   g_debug("onEnable");
-  ibus_engine_get_surrounding_text(engine, nullptr, nullptr, nullptr);
   auto *self = reinterpret_cast<WeTypeEngine *>(engine);
   self->state->enabled = true;
   activate(self->state);
@@ -1104,22 +1098,6 @@ void onContentType(IBusEngine *engine, guint purpose, guint hints) {
   activate(state);
 }
 
-void onSetSurroundingText(IBusEngine *engine, IBusText *ibus_text, guint cursor_pos, guint) {
-  const gchar *text = ibus_text ? ibus_text_get_text(ibus_text) : nullptr;
-  if (!text || cursor_pos == 0) {
-    return;
-  }
-
-  const gchar *cursor_ptr = g_utf8_offset_to_pointer(text, cursor_pos);
-  const gchar *prev_ptr = g_utf8_find_prev_char(text, cursor_ptr);
-  if (prev_ptr) {
-    const gunichar unicode = g_utf8_get_char(prev_ptr);
-    auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-    state->isCursorBehindAscii = (unicode >= 0x20 && unicode <= 0x7e) ? true : false;
-    g_debug_func("prev=U+%04X isCursorBehindAscii=%d", unicode, state->isCursorBehindAscii);
-  }
-}
-
 void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
   g_debug("onPropertyActivate");
 
@@ -1155,16 +1133,6 @@ void onPropertyActivate(IBusEngine *engine, const gchar *propertyName, guint) {
   updateModeProperty(state);
 }
 
-void onSetCapabilities(IBusEngine *engine, guint caps) {
-  g_debug_func("caps=0x%08x", caps);
-  if (caps & IBUS_CAP_SURROUNDING_TEXT) {
-    ibus_engine_get_surrounding_text(engine, nullptr, nullptr, nullptr);
-  } else {
-    auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-    state->isCursorBehindAscii = true;
-  }
-}
-
 void finalize(GObject *object) {
   auto *self = reinterpret_cast<WeTypeEngine *>(object);
   if (self->state) {
@@ -1193,7 +1161,7 @@ void wetype_engine_class_init(WeTypeEngineClass *klass) {
   engineClass->enable = onEnable;
   engineClass->disable = onDisable;
   // engineClass->set_cursor_location = onSetCursorLocation;
-  engineClass->set_capabilities = onSetCapabilities;
+  // engineClass->set_capabilities = onSetCapabilities;
   engineClass->page_up = onPageUp;
   engineClass->page_down = onPageDown;
   engineClass->cursor_up = onCursorUp;
@@ -1202,7 +1170,7 @@ void wetype_engine_class_init(WeTypeEngineClass *klass) {
   // engineClass->property_show = onPropertyShow;
   // engineClass->property_hide = onPropertyHide;
   engineClass->candidate_clicked = onCandidateClicked;
-  engineClass->set_surrounding_text = onSetSurroundingText;
+  // engineClass->set_surrounding_text = onSetSurroundingText;
   engineClass->set_content_type = onContentType;
 }
 
