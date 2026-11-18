@@ -36,6 +36,7 @@ struct Settings {
   int wubiSolution = 0;
   int pageSize = 5;
   bool standalone = false;
+  bool traditional = false;
   bool chinesePunctuation = true;
   bool slashPunctuation = true;
   bool vertical = false;
@@ -109,6 +110,10 @@ struct EngineState {
   bool enabled = false;
   bool active = false;
   bool english = false;
+  bool fullWidth = false;
+  bool fullHalfShortcutDown = false;
+  bool punctuationShortcutDown = false;
+  bool traditionalShortcutDown = false;
   bool shiftCandidate = false;
   uint8_t pressedShifts = 0;
   int64_t shiftPressedAt = 0;
@@ -127,6 +132,11 @@ struct EngineState {
 uint64_t nextSession = 0;
 bool sharedEnglishMode = false;
 bool sharedModeInitialized = false;
+bool sharedFullWidthMode = false;
+bool sharedTraditionalMode = false;
+bool sharedChinesePunctuationMode = true;
+bool sharedChinesePunctuationConfig = true;
+bool sharedChinesePunctuationInitialized = false;
 pid_t syncPid = -1;
 guint syncWatch = 0;
 
@@ -431,6 +441,14 @@ void restartBackend(EngineState *state) {
   closeBackend(state);
   state->backendFailed = false;
   state->settings = readSettings();
+  if (!sharedChinesePunctuationInitialized || state->settings.chinesePunctuation != sharedChinesePunctuationConfig) {
+    sharedChinesePunctuationConfig = state->settings.chinesePunctuation;
+    sharedChinesePunctuationMode = sharedChinesePunctuationConfig;
+    sharedChinesePunctuationInitialized = true;
+  }
+  state->settings.chinesePunctuation = sharedChinesePunctuationMode;
+  state->settings.traditional = sharedTraditionalMode;
+  state->fullWidth = sharedFullWidthMode;
   updateUi(state);
 }
 
@@ -461,6 +479,7 @@ void putSettings(json_object *request, const Settings &settings) {
   wire::put(request, "symbol_emoji", settings.symbolEmoji);
   wire::put(request, "v_mode", settings.shortcuts[kShortcutVMode]);
   wire::put(request, "chinese_punctuation", settings.chinesePunctuation);
+  wire::put(request, "traditional", settings.traditional);
   for (size_t i = 0; i < fuzzyKeys.size(); ++i)
     wire::put(request, fuzzyKeys[i], settings.fuzzy[i]);
   for (size_t i = 0; i < shortcutKeys.size(); ++i)
@@ -587,6 +606,9 @@ void resetComposition(EngineState *state, bool sendReset) {
   state->pressedShifts = 0;
   state->ctrlCandidate = false;
   state->pressedCtrls = 0;
+  state->fullHalfShortcutDown = false;
+  state->punctuationShortcutDown = false;
+  state->traditionalShortcutDown = false;
   clearUi(state);
   if (sendReset)
     sendRequest(state, "reset");
@@ -671,6 +693,14 @@ void activate(EngineState *state) {
   state->active = active;
   if (active) {
     state->settings = readSettings();
+    if (!sharedChinesePunctuationInitialized || state->settings.chinesePunctuation != sharedChinesePunctuationConfig) {
+      sharedChinesePunctuationConfig = state->settings.chinesePunctuation;
+      sharedChinesePunctuationMode = sharedChinesePunctuationConfig;
+      sharedChinesePunctuationInitialized = true;
+    }
+    state->settings.chinesePunctuation = sharedChinesePunctuationMode;
+    state->settings.traditional = sharedTraditionalMode;
+    state->fullWidth = sharedFullWidthMode;
     if (!sharedModeInitialized) {
       sharedEnglishMode = state->settings.defaultLanguage == "english";
       sharedModeInitialized = true;
@@ -722,6 +752,8 @@ bool splitPunctuationPair(const std::string &text, std::string &left, std::strin
   return true;
 }
 
+std::string fullWidthAscii(std::string_view ascii);
+
 bool processPunctuation(EngineState *state, gunichar unicode) {
   if (unicode < 0x20 || unicode > 0x7e)
     return false;
@@ -745,6 +777,8 @@ bool processPunctuation(EngineState *state, gunichar unicode) {
     }
   } else {
     mapped = it->english;
+    if (state->fullWidth)
+      mapped = fullWidthAscii(mapped);
   }
 
   if (it->pairType && splitPunctuationPair(mapped, left, right)) {
@@ -850,6 +884,106 @@ bool processLanguageSwitchKey(IBusEngine *engine, guint keyval, guint modifiers)
   return true;
 }
 
+std::string fullWidthAscii(std::string_view ascii) {
+  std::string result;
+  result.reserve(ascii.size() * 3);
+  for (const unsigned char character : ascii) {
+    const gunichar unicode = character == ' ' ? 0x3000 : character + 0xfee0;
+    gchar encoded[8] = {};
+    const int length = g_unichar_to_utf8(unicode, encoded);
+    result.append(encoded, static_cast<size_t>(length));
+  }
+  return result;
+}
+
+bool commitFullWidthAscii(IBusEngine *engine, gunichar unicode) {
+  if (unicode < 0x20 || unicode > 0x7e)
+    return false;
+  const char ascii[] = {static_cast<char>(unicode)};
+  const auto fullWidth = fullWidthAscii(std::string_view(ascii, sizeof(ascii)));
+  ibus_engine_commit_text(engine, ibus_text_new_from_string(fullWidth.c_str()));
+  return true;
+}
+
+void toggleTraditionalMode(EngineState *state) {
+  auto *engine = IBUS_ENGINE(state->owner);
+  state->settings.traditional = !state->settings.traditional;
+  sharedTraditionalMode = state->settings.traditional;
+  if (!state->preedit.empty())
+    ibus_engine_commit_text(engine, ibus_text_new_from_string(state->preedit.c_str()));
+  resetComposition(state, false);
+  if (!sendRequest(state, "close") || !sendRequest(state, "open")) {
+    state->backendFailed = true;
+    g_warning("Unable to recreate the WeTypeX session after changing script mode");
+    updateUi(state);
+  }
+}
+
+bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers) {
+  auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
+  if (!state->active)
+    return false;
+  const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
+  const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
+  const guint otherCommandModifiers = kCommandModifierMask & ~IBUS_CONTROL_MASK;
+
+  if (keyval == IBUS_KEY_space) {
+    if (release) {
+      const bool handled = state->fullHalfShortcutDown;
+      state->fullHalfShortcutDown = false;
+      return handled;
+    }
+    if ((cleanModifiers & IBUS_SHIFT_MASK) != 0 &&
+        (cleanModifiers & (IBUS_CONTROL_MASK | otherCommandModifiers)) == 0 &&
+        state->settings.shortcuts[kShortcutFullHalfSwitch]) {
+      if (!state->fullHalfShortcutDown) {
+        state->fullWidth = !state->fullWidth;
+        sharedFullWidthMode = state->fullWidth;
+      }
+      state->fullHalfShortcutDown = true;
+      return true;
+    }
+    return false;
+  }
+
+  if (keyval == IBUS_KEY_period) {
+    if (release) {
+      const bool handled = state->punctuationShortcutDown;
+      state->punctuationShortcutDown = false;
+      return handled;
+    }
+    if ((cleanModifiers & IBUS_CONTROL_MASK) != 0 &&
+        (cleanModifiers & (IBUS_SHIFT_MASK | otherCommandModifiers)) == 0 && !state->english &&
+        state->settings.shortcuts[kShortcutPunctuationSwitch]) {
+      if (!state->punctuationShortcutDown) {
+        state->settings.chinesePunctuation = !state->settings.chinesePunctuation;
+        sharedChinesePunctuationMode = state->settings.chinesePunctuation;
+      }
+      state->punctuationShortcutDown = true;
+      return true;
+    }
+    return false;
+  }
+
+  const gunichar unicode = g_unichar_tolower(ibus_keyval_to_unicode(keyval));
+  if (unicode != 'f')
+    return false;
+  if (release) {
+    const bool handled = state->traditionalShortcutDown;
+    state->traditionalShortcutDown = false;
+    return handled;
+  }
+  if ((cleanModifiers & (IBUS_CONTROL_MASK | IBUS_SHIFT_MASK)) == (IBUS_CONTROL_MASK | IBUS_SHIFT_MASK) &&
+      (cleanModifiers & otherCommandModifiers) == 0 && !state->english &&
+      state->settings.shortcuts[kShortcutTraditionalSwitch]) {
+    if (!state->traditionalShortcutDown)
+      toggleTraditionalMode(state);
+    state->traditionalShortcutDown = true;
+    return true;
+  }
+  return false;
+}
+
 gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
@@ -859,6 +993,8 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
 
   if (processLanguageSwitchKey(engine, keyval, modifiers))
     return FALSE;
+  if (processInputStateShortcut(engine, keyval, modifiers))
+    return TRUE;
 
   if (keyval == IBUS_KEY_Super_L || keyval == IBUS_KEY_Super_R || keyval == IBUS_KEY_Hyper_L ||
       keyval == IBUS_KEY_Hyper_R || keyval == IBUS_KEY_Meta_L || keyval == IBUS_KEY_Meta_R ||
@@ -983,8 +1119,15 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
   const bool letter = (unicode >= 'a' && unicode <= 'z') || (unicode >= 'A' && unicode <= 'Z');
   const bool separator = unicode == '\'' && !state->preedit.empty() && state->settings.inputMode != "wubi";
 
-  if (state->english)
+  if (state->english) {
+    if (state->fullWidth && commitFullWidthAscii(engine, unicode))
+      return TRUE;
     return FALSE;
+  }
+
+  if (state->fullWidth && state->preedit.empty() && (unicode == ' ' || (unicode >= '0' && unicode <= '9')) &&
+      commitFullWidthAscii(engine, unicode))
+    return TRUE;
 
   if (letter || separator) {
     char text[2] = {static_cast<char>(unicode), '\0'};
