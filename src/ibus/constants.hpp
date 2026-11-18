@@ -5,8 +5,13 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 
 namespace ibus_engine::constants {
+
+inline std::filesystem::path configPath() {
+  return std::filesystem::path(g_get_user_config_dir()) / "ibus/wetypex/wetypex.json";
+}
 
 inline constexpr std::array<const char *, 19> fuzzyKeys = {
     "fuzzy_nl",       "fuzzy_rl",       "fuzzy_hf",     "fuzzy_gk",     "fuzzy_an_ang",
