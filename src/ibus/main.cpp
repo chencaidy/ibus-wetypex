@@ -852,6 +852,16 @@ void selectCandidate(EngineState *state, int index, bool pageRelative = false) {
   updateUi(state);
 }
 
+void changeCandidatePage(EngineState *state, int direction) {
+  const int pageCount =
+      static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
+  if (pageCount <= 1)
+    return;
+  state->candidatePage = std::clamp(state->candidatePage + direction, 0, pageCount - 1);
+  state->candidateCursor = state->candidatePage * state->settings.pageSize;
+  updateUi(state);
+}
+
 void updateCursor(EngineState *state, size_t position) {
   position = std::clamp(position, state->editableBegin, state->preedit.size());
   if (position == state->cursor)
@@ -1009,6 +1019,66 @@ bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers
   return false;
 }
 
+bool processCandidatePageShortcut(IBusEngine *engine, guint keyval, guint modifiers) {
+  auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
+  if (!state->active || state->preedit.empty())
+    return false;
+
+  const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
+  const guint cleanModifiers = modifiers & ~IBUS_RELEASE_MASK;
+  const guint shortcutModifiers = kCommandModifierMask | IBUS_SHIFT_MASK;
+  int direction = 0;
+  bool enabled = false;
+
+  if (keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_Page_Down) {
+    enabled = true;
+    direction = keyval == IBUS_KEY_Page_Down ? 1 : -1;
+  } else if (keyval == IBUS_KEY_Tab || keyval == IBUS_KEY_ISO_Left_Tab) {
+    if ((cleanModifiers & kCommandModifierMask) != 0)
+      return false;
+    const bool shift = keyval == IBUS_KEY_ISO_Left_Tab || (cleanModifiers & IBUS_SHIFT_MASK) != 0;
+    enabled = state->settings.shortcuts[kShortcutPageShiftTab];
+    direction = shift ? -1 : 1;
+  } else {
+    if ((cleanModifiers & shortcutModifiers) != 0)
+      return false;
+    switch (keyval) {
+    case IBUS_KEY_minus:
+      enabled = state->settings.shortcuts[kShortcutPageMinusEqual];
+      direction = -1;
+      break;
+    case IBUS_KEY_equal:
+      enabled = state->settings.shortcuts[kShortcutPageMinusEqual];
+      direction = 1;
+      break;
+    case IBUS_KEY_bracketleft:
+      enabled = state->settings.shortcuts[kShortcutPageBrackets];
+      direction = -1;
+      break;
+    case IBUS_KEY_bracketright:
+      enabled = state->settings.shortcuts[kShortcutPageBrackets];
+      direction = 1;
+      break;
+    case IBUS_KEY_comma:
+      enabled = state->settings.shortcuts[kShortcutPageCommaPeriod];
+      direction = -1;
+      break;
+    case IBUS_KEY_period:
+      enabled = state->settings.shortcuts[kShortcutPageCommaPeriod];
+      direction = 1;
+      break;
+    default:
+      return false;
+    }
+  }
+
+  if (!enabled)
+    return false;
+  if (!release)
+    changeCandidatePage(state, direction);
+  return true;
+}
+
 gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint modifiers) {
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
   const bool release = (modifiers & IBUS_RELEASE_MASK) != 0;
@@ -1038,6 +1108,9 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
 
   if (!state->active)
     return FALSE;
+
+  if (processCandidatePageShortcut(engine, keyval, modifiers))
+    return TRUE;
 
   if (release)
     return FALSE;
@@ -1110,18 +1183,6 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
 
     if (keyval == IBUS_KEY_End) {
       updateCursor(state, state->preedit.size());
-      return TRUE;
-    }
-
-    if (keyval == IBUS_KEY_Page_Up || keyval == IBUS_KEY_Page_Down) {
-      const int pageCount =
-          static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
-      if (pageCount > 1) {
-        state->candidatePage =
-            std::clamp(state->candidatePage + (keyval == IBUS_KEY_Page_Down ? 1 : -1), 0, pageCount - 1);
-        state->candidateCursor = state->candidatePage * state->settings.pageSize;
-        updateUi(state);
-      }
       return TRUE;
     }
 
@@ -1214,23 +1275,13 @@ void onReset(IBusEngine *engine) {
 void onPageUp(IBusEngine *engine) {
   g_debug("onPageUp");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-  if (state->candidatePage > 0) {
-    state->candidatePage--;
-    state->candidateCursor = state->candidatePage * state->settings.pageSize;
-    updateUi(state);
-  }
+  changeCandidatePage(state, -1);
 }
 
 void onPageDown(IBusEngine *engine) {
   g_debug("onPageDown");
   auto *state = reinterpret_cast<WeTypeEngine *>(engine)->state;
-  const int pages =
-      static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
-  if (state->candidatePage + 1 < pages) {
-    state->candidatePage++;
-    state->candidateCursor = state->candidatePage * state->settings.pageSize;
-    updateUi(state);
-  }
+  changeCandidatePage(state, 1);
 }
 
 void onCursorUp(IBusEngine *engine) {
