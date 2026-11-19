@@ -83,7 +83,7 @@ WeTypeX IBus 引擎 ──────── 候选、预编辑、快捷键、�
 从 Release 界面下载 DEB 包：
 
 ```bash
-sudo apt install ./ibus-wetypex_2.2.3.657-3_amd64.deb
+sudo apt install ./ibus-wetypex_2.2.3.657-4_amd64.deb
 ```
 
 ### Fedora
@@ -91,7 +91,7 @@ sudo apt install ./ibus-wetypex_2.2.3.657-3_amd64.deb
 从 Release 界面下载 RPM 包：
 
 ```bash
-sudo dnf install ./ibus-wetypex-2.2.3.657-3.x86_64.rpm
+sudo dnf install ./ibus-wetypex-2.2.3.657-4.x86_64.rpm
 ```
 
 ### 从源码安装
