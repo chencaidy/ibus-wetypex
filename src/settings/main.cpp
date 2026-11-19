@@ -1078,11 +1078,8 @@ GtkWidget *build_shortcuts_page() {
 
   GtkWidget *candidate_selection_group = make_group(kGroupCandidateSelection);
   adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_selection_group),
-                            switch_row(kCandidateSemicolonQuoteTitle, nullptr, "shortcut_candidate_semicolon_quote",
-                                       setting_bool(settings.get(), "shortcut_candidate_semicolon_quote", false)));
-  adw_preferences_group_add(ADW_PREFERENCES_GROUP(candidate_selection_group),
-                            switch_row(kCandidateCtrlTitle, nullptr, "shortcut_candidate_ctrl",
-                                       setting_bool(settings.get(), "shortcut_candidate_ctrl", false)));
+                            switch_row(kCandidateNumpadTitle, nullptr, "shortcut_candidate_numpad",
+                                       setting_bool(settings.get(), "shortcut_candidate_numpad", false)));
   adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(candidate_selection_group));
 
   return page;
