@@ -55,6 +55,11 @@ jobs:
           WETYPEX_BUILD_JOBS: "2"
         run: bash packaging/build-ubuntu-package.sh
 
+      - name: 构建 Fedora 软件包
+        env:
+          WETYPEX_BUILD_JOBS: "2"
+        run: bash packaging/build-fedora-package.sh
+
       - name: 生成源码包与 Arch 构建文件
         run: python3 tools/package_release.py
 
@@ -83,10 +88,11 @@ jobs:
             while IFS= read -r -d '' file; do
               digest=$(sha256sum "$file" | cut -d' ' -f1)
               printf '%s  %s\n' "$digest" "$(basename "$file")"
-            done < <(find arch ubuntu . -maxdepth 1 -type f \
+            done < <(find arch ubuntu fedora . -maxdepth 1 -type f \
               \( -name 'ibus-wetypex-*.tar.gz' -o \
                  -name 'ibus-wetypex-*.pkg.tar.zst' -o \
-                 -name 'ibus-wetypex_*.deb' \) \
+                 -name 'ibus-wetypex_*.deb' -o \
+                 -name 'ibus-wetypex-*.rpm' \) \
               -print0 | sort -z)
           ) > dist/SHA256SUMS
 
@@ -98,6 +104,7 @@ jobs:
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/ubuntu/ibus-wetypex_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
             dist/SHA256SUMS
 
       - name: 创建 GitHub Release
@@ -109,6 +116,7 @@ jobs:
             dist/arch/ibus-wetypex-*.tar.gz
             dist/arch/ibus-wetypex-*.pkg.tar.zst
             dist/ubuntu/ibus-wetypex_*.deb
+            dist/fedora/ibus-wetypex-*.rpm
             dist/SHA256SUMS
           )
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

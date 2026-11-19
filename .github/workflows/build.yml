@@ -108,3 +108,55 @@ jobs:
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./packages/*.deb
           wetypex-account network-info
+
+  fedora-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - name: 安装 nFPM
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+          sudo install "$(go env GOPATH)/bin/nfpm" /usr/local/bin/nfpm
+          sudo apt-get update
+          sudo apt-get install -y rpm
+      - name: 构建 Fedora 软件包
+        env:
+          WETYPEX_BUILD_JOBS: "2"
+        run: bash packaging/build-fedora-package.sh
+      - name: 验证 RPM 元数据与文件布局
+        shell: bash
+        run: |
+          package=$(find dist/fedora -maxdepth 1 -type f -name 'ibus-wetypex-*.rpm' -print -quit)
+          test -n "$package"
+          test "$(rpm -qp --qf '%{NAME}\n' "$package")" = ibus-wetypex
+          rpm -qp --requires "$package" | grep -F 'ibus'
+          rpm -qlp "$package" | grep -F '/usr/libexec/ibus-engine-wetypex'
+          rpm -qlp "$package" | grep -F '/usr/bin/wetypex-setup'
+          rpm -qlp "$package" | grep -F '/usr/bin/wetypex-settings'
+          rpm -qlp "$package" | grep -F '/usr/share/applications/ibus-setup-wetypex.desktop'
+          rpm -qlp "$package" | grep -F '/usr/share/ibus/component/wetypex.xml'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ibus-wetypex-fedora
+          path: |
+            dist/fedora/ibus-wetypex-*.rpm
+          if-no-files-found: error
+          retention-days: 30
+
+  fedora-runtime:
+    needs: fedora-build
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: ibus-wetypex-fedora
+          path: packages
+      - name: 安装软件包并启动网络诊断
+        run: |
+          dnf -y install ./packages/*.rpm
+          wetypex-account network-info

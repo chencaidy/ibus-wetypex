@@ -1,0 +1,40 @@
+name: ibus-wetypex
+arch: amd64
+platform: linux
+version: "@WETYPEX_VERSION@"
+release: "@WETYPEX_RELEASE@"
+section: utils
+priority: optional
+maintainer: WeTypeX contributors <https://github.com/chencaidy/ibus-wetypex>
+description: WeTypeX native Linux input method for IBus
+vendor: WeTypeX contributors
+homepage: https://github.com/chencaidy/ibus-wetypex
+license: MIT AND curl AND ISC AND BSD-2-Clause AND Apache-2.0
+scripts:
+  postinstall: "@WETYPEX_PROJECT_ROOT@/packaging/post-install.sh"
+contents:
+  - src: "@WETYPEX_STAGE@/"
+    dst: /
+    type: tree
+overrides:
+  rpm:
+    depends:
+      - bubblewrap
+      - ca-certificates
+      - curl
+      - ffmpeg-free
+      - fontconfig
+      - ibus
+      - gtk4
+      - libadwaita
+      - libcxx
+      - libcxxabi
+      - json-c
+      - libnotify
+      - openssl-libs
+      - pipewire
+      - python3
+      - python3-fonttools
+      - python3-pillow
+      - util-linux
+      - polkit

@@ -17,7 +17,7 @@
 packaging/build-packages.sh
 ```
 
-脚本通过统一的 `/usr` staging 目录生成便携 `tar.zst`，在 Ubuntu 26.04 容器中编译标准 deb，最后调用 makepkg 生成 Arch 软件包。系统需要预先安装 Docker、`nfpm`、`makepkg`、zstd 和本机构建依赖。
+脚本通过统一的 `/usr` staging 目录生成便携 `tar.zst`，在 Ubuntu 22.04 容器中编译标准 deb，在 Fedora 44 容器中编译标准 rpm，最后调用 makepkg 生成 Arch 软件包。系统需要预先安装 Docker、`nfpm`、`makepkg`、zstd 和本机构建依赖。
 
 标准 deb 使用当前发行版的 gtk4、ibus 和 glibc 构建。
 
@@ -27,7 +27,7 @@ packaging/build-packages.sh
 
 网络桥接默认静态包含固定版本 libcurl，启用 WS/WSS、OpenSSL 和线程 DNS 解析，避免发行版关闭 WebSocket 功能导致运行时失败。curl 源码版本与 SHA-256 固定在 `cmake/BundledCurl.cmake` 和 Arch 构建文件中，更新时应同步维护。可用 `-DWETYPE_BUNDLED_CURL=OFF` 选择系统 libcurl 8.9+，还需确认其构建启用了 WS/WSS。
 
-系统 OpenSSL 低于 3 时，构建私有静态 OpenSSL 3.5.5；其源代码与 SHA-256 固定在 `cmake/BundledOpenSSL.cmake`，许可证随包安装。CMake 3.22 使用 curl 发布源码中的 configure 构建，仍保持 WS/WSS、证书校验和 LTO 隔离。Fedora 40 构建使用签名校验开启的官方归档仓库。
+系统 OpenSSL 低于 3 时，构建私有静态 OpenSSL 3.5.5；其源代码与 SHA-256 固定在 `cmake/BundledOpenSSL.cmake`，许可证随包安装。CMake 3.22 使用 curl 发布源码中的 configure 构建，仍保持 WS/WSS、证书校验和 LTO 隔离。Fedora 44 构建使用签名校验开启的官方归档仓库。
 
 ## 独立包
 
@@ -38,6 +38,14 @@ bash packaging/build-ubuntu-package.sh
 ```
 
 该脚本需要 Docker 和 nFPM，生成的 `.deb` 位于 `dist/ibus/`。包依赖 IBus、GTK4、libadwaita 与共享业务运行时，引擎元数据安装到 `/usr/share/ibus/component`，可执行引擎安装到隔离的 libexec 目录。设置窗口和隔空传送窗口均为独立的 GTK4 + libadwaita 程序；剪贴板扩展安装到 `/usr/share/gnome-shell/extensions/wetypex-clip-watcher@caidy.cc`，用户重新登录后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc` 启用。运行时配置、账户及剪贴板同步仍沿用现有 XDG 用户数据路径。首版不提供 AI、语音、V 模式或剪贴板历史。源码构建需要 `libgtk-4-dev`、`libadwaita-1-dev`、`libjson-c-dev` 和 `libibus-1.0-dev`。
+
+Fedora 44 变体使用相同的包名和 `/usr` 安装布局：
+
+```bash
+bash packaging/build-fedora-package.sh
+```
+
+该脚本需要 Docker 和 nFPM，生成的 `.rpm` 位于 `dist/fedora/`。构建环境固定为 `fedora:44`，包依赖由 `packaging/nfpm-fedora.yaml` 中的 RPM override 定义。
 
 也可以只生成源码包与 Arch 构建文件：
 

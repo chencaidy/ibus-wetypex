@@ -42,7 +42,15 @@
 | 隔空传送 | 在电脑与关联设备间传送文件和文件夹，支持二维码邀请 |
 | 个人词库与常用语 | 本地持久化，支持远程同步 |
 
-目前仅在 Ubuntu 24.04 和 26.04 上进行测试，各项能力的支持范围见[功能状态](docs/feature-status.md)。
+## 兼容性
+
+- Ubuntu 22.04
+- Ubuntu 24.04
+- Ubuntu 26.04
+- Fedora 44
+- Fedora 45
+
+各项能力的支持范围见[功能状态](docs/feature-status.md)。
 
 ## 工作方式
 
@@ -72,10 +80,18 @@ WeTypeX IBus 引擎 ──────── 候选、预编辑、快捷键、�
 
 ### Ubuntu
 
-从 Release 界面下载对应发行版的最新版本：
+从 Release 界面下载 DEB 包：
 
 ```bash
 sudo apt install ./ibus-wetypex_2.2.3.657-3_amd64.deb
+```
+
+### Fedora
+
+从 Release 界面下载 RPM 包：
+
+```bash
+sudo dnf install ./ibus-wetypex-2.2.3.657-3.x86_64.rpm
 ```
 
 ### 从源码安装

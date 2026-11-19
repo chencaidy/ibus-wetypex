@@ -7,11 +7,12 @@ output="$project_root/dist"
 stage="$output/root"
 
 mkdir -p "$output"
-find "$output" "$output/arch" "$output/ubuntu" \
+find "$output" "$output/arch" "$output/ubuntu" "$output/fedora" \
     -maxdepth 1 -type f \
     \( -name 'ibus-wetypex-*.tar.gz' -o \
        -name 'ibus-wetypex-*.pkg.tar.zst' -o \
        -name 'ibus-wetypex_*.deb' -o \
+       -name 'ibus-wetypex-*.rpm' -o \
        -name 'ibus-wetypex-*.tar.zst' \) \
     -delete 2>/dev/null || true
 rm -rf "$stage"
@@ -33,15 +34,22 @@ else
     printf '未找到 makepkg，跳过 Arch 软件包。\n' >&2
 fi
 
+if command -v nfpm >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
+    "$project_root/packaging/build-fedora-package.sh"
+else
+    printf '未同时找到 Docker 和 nFPM，跳过 Fedora rpm。\n' >&2
+fi
+
 (
     cd "$output"
     while IFS= read -r -d '' file; do
         digest=$(sha256sum "$file" | cut -d' ' -f1)
         printf '%s  %s\n' "$digest" "$(basename "$file")"
-    done < <(find . arch ubuntu -maxdepth 1 -type f \
+    done < <(find . arch ubuntu fedora -maxdepth 1 -type f \
         \( -name 'ibus-wetypex-*.tar.gz' -o \
            -name 'ibus-wetypex-*.pkg.tar.zst' -o \
            -name 'ibus-wetypex_*.deb' -o \
+           -name 'ibus-wetypex-*.rpm' -o \
            -name 'ibus-wetypex-*.tar.zst' \) \
         -print0 | sort -z)
 ) >"$output/SHA256SUMS"
