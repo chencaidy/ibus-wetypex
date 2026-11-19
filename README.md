@@ -136,7 +136,8 @@ gnome-extensions enable wetypex-clip-watcher@caidy.cc
 
 常用操作：
 
-* `Shift`：切换中英文。
+* `Shift`：默认切换中英文
+* 更多输入状态切换详见[按键与输入模式](docs/input-handling.md)。
 
 常用命令：
 
