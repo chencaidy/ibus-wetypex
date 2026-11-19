@@ -34,7 +34,7 @@ packaging/build-packages.sh
 Ubuntu 变体使用 `ibus-wetypex` 包名，共享可执行文件和数据安装到 `/usr/lib/ibus-wetypex` 下，系统入口仅使用专属名称，以避免 dpkg 文件冲突：
 
 ```bash
-bash packaging/build-ubuntu-package.sh
+bash packaging/ubuntu/build-ubuntu-package.sh
 ```
 
 该脚本需要 Docker 和 nFPM，生成的 `.deb` 位于 `dist/ibus/`。包依赖 IBus、GTK4、libadwaita 与共享业务运行时，引擎元数据安装到 `/usr/share/ibus/component`，可执行引擎安装到隔离的 libexec 目录。设置窗口和隔空传送窗口均为独立的 GTK4 + libadwaita 程序；剪贴板扩展安装到 `/usr/share/gnome-shell/extensions/wetypex-clip-watcher@caidy.cc`，用户重新登录后执行 `gnome-extensions enable wetypex-clip-watcher@caidy.cc` 启用。运行时配置、账户及剪贴板同步仍沿用现有 XDG 用户数据路径。首版不提供 AI、语音、V 模式或剪贴板历史。源码构建需要 `libgtk-4-dev`、`libadwaita-1-dev`、`libjson-c-dev` 和 `libibus-1.0-dev`。
@@ -42,10 +42,10 @@ bash packaging/build-ubuntu-package.sh
 Fedora 44 变体使用相同的包名和 `/usr` 安装布局：
 
 ```bash
-bash packaging/build-fedora-package.sh
+bash packaging/fedora/build-fedora-package.sh
 ```
 
-该脚本需要 Docker 和 nFPM，生成的 `.rpm` 位于 `dist/fedora/`。构建环境固定为 `fedora:44`，包依赖由 `packaging/nfpm-fedora.yaml` 中的 RPM override 定义。
+该脚本需要 Docker 和 nFPM，生成的 `.rpm` 位于 `dist/fedora/`。构建环境固定为 `fedora:44`，包依赖由 `packaging/fedora/nfpm-fedora.yaml` 中的 RPM override 定义。
 
 也可以只生成源码包与 Arch 构建文件：
 
@@ -57,7 +57,7 @@ makepkg -C -f --noconfirm
 
 ## AUR
 
-每次正式发布后，发布工作流会使用仓库中的 `packaging/aur/PKGBUILD` 更新
+每次正式发布后，发布工作流会使用仓库中的 `packaging/arch/aur/PKGBUILD` 更新
 `ibus-wetypex` AUR 软件包及其 `.SRCINFO`。工作流支持只重试 AUR 发布，
 无需重复构建其他发行格式。
 
@@ -68,10 +68,11 @@ makepkg -C -f --noconfirm
 发布版本必须同时更新：
 
 - `CMakeLists.txt` 的 `project(... VERSION ...)`。
-- `packaging/PKGBUILD.in` 的 `pkgver`。
+- `packaging/arch/PKGBUILD.in` 的 `pkgver`。
 - `tools/package_release.py` 的 `version`。
-- 发布修订时同步更新 `packaging/PKGBUILD.in`、AUR `PKGBUILD` 的
-  `pkgrel` 与 `packaging/nfpm-*.yaml` 的 `release`。
+- 发布修订时同步更新 `packaging/arch/PKGBUILD.in`、AUR `PKGBUILD` 的
+  `pkgrel` 与 `packaging/ubuntu/nfpm-ubuntu.yaml`、
+  `packaging/fedora/nfpm-fedora.yaml` 的 `release`。
 - README 安装示例。
 
 ## 安装布局

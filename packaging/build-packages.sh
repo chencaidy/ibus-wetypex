@@ -22,7 +22,7 @@ mkdir -p "$stage"
 tar --zstd -C "$stage" -cf "$output/ibus-wetypex-${version}-linux-x86_64.tar.zst" .
 
 if command -v nfpm >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
-    "$project_root/packaging/build-ubuntu-package.sh"
+    "$project_root/packaging/ubuntu/build-ubuntu-package.sh"
 else
     printf '未同时找到 Docker 和 nFPM，跳过原生 deb。\n' >&2
 fi
@@ -35,7 +35,7 @@ else
 fi
 
 if command -v nfpm >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
-    "$project_root/packaging/build-fedora-package.sh"
+    "$project_root/packaging/fedora/build-fedora-package.sh"
 else
     printf '未同时找到 Docker 和 nFPM，跳过 Fedora rpm。\n' >&2
 fi

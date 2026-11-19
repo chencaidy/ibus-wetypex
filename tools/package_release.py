@@ -14,6 +14,6 @@ with archive.open('wb') as raw,gzip.GzipFile(fileobj=raw,mode='wb',mtime=0,filen
         info=tar.gettarinfo(str(path),f'ibus-wetypex-{version}/'+str(path.relative_to(root)));info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0
         with path.open('rb') as source:tar.addfile(info,source)
 digest=hashlib.sha256(archive.read_bytes()).hexdigest()
-(output/'PKGBUILD').write_text((root/'packaging/PKGBUILD.in').read_text().replace('@SOURCE_SHA256@',digest))
-(output/'ibus-wetypex.install').write_text((root/'packaging/aur/ibus-wetypex.install').read_text())
+(output/'PKGBUILD').write_text((root/'packaging/arch/PKGBUILD.in').read_text().replace('@SOURCE_SHA256@',digest))
+(output/'ibus-wetypex.install').write_text((root/'packaging/arch/aur/ibus-wetypex.install').read_text())
 print(archive);print('SHA256 '+digest)

@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           version=$(sed -n 's/^project([^ ]* VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
-          pkgrel=$(sed -n 's/^pkgrel=//p' packaging/PKGBUILD.in)
+          pkgrel=$(sed -n 's/^pkgrel=//p' packaging/arch/PKGBUILD.in)
           test "v${version}-${pkgrel}" = "${RELEASE_TAG}"
 
       - name: 安装发布工具
@@ -53,12 +53,12 @@ jobs:
       - name: 构建 Ubuntu 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-ubuntu-package.sh
+        run: bash packaging/ubuntu/build-ubuntu-package.sh
 
       - name: 构建 Fedora 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-fedora-package.sh
+        run: bash packaging/fedora/build-fedora-package.sh
 
       - name: 生成源码包与 Arch 构建文件
         run: python3 tools/package_release.py
@@ -160,11 +160,11 @@ jobs:
   #           GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
   #           bash -lc '
   #             git clone ssh://aur@aur.archlinux.org/ibus-wetypex.git "$HOME/aur"
-  #             cp "$1/packaging/aur/PKGBUILD" \
-  #                "$1/packaging/aur/ibus-wetypex.install" "$HOME/aur/"
+  #             cp "$1/packaging/arch/aur/PKGBUILD" \
+  #                "$1/packaging/arch/aur/ibus-wetypex.install" "$HOME/aur/"
   #             cd "$HOME/aur"
   #             version=$(sed -n "s/^project([^ ]* VERSION \([^ ]*\).*/\1/p" "$1/CMakeLists.txt")
-  #             pkgrel=$(sed -n "s/^pkgrel=//p" "$1/packaging/PKGBUILD.in")
+  #             pkgrel=$(sed -n "s/^pkgrel=//p" "$1/packaging/arch/PKGBUILD.in")
   #             sed -i "s/^pkgver=.*/pkgver=$version/" PKGBUILD
   #             sed -i "s/^pkgrel=.*/pkgrel=$pkgrel/" PKGBUILD
   #             source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/ibus-wetypex-${version}.tar.gz"

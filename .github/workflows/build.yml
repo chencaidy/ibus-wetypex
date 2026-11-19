@@ -65,7 +65,7 @@ jobs:
       - name: 构建 Ubuntu 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-ubuntu-package.sh
+        run: bash packaging/ubuntu/build-ubuntu-package.sh
       - name: 验证 DEB 包元数据与前端依赖
         shell: bash
         run: |
@@ -126,7 +126,7 @@ jobs:
       - name: 构建 Fedora 软件包
         env:
           WETYPEX_BUILD_JOBS: "2"
-        run: bash packaging/build-fedora-package.sh
+        run: bash packaging/fedora/build-fedora-package.sh
       - name: 验证 RPM 元数据与文件布局
         shell: bash
         run: |
