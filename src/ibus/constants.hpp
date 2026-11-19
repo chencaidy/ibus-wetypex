@@ -33,8 +33,7 @@ enum ShortcutKey : std::size_t {
   kShortcutPageBrackets,
   kShortcutPageCommaPeriod,
   kShortcutPageShiftTab,
-  kShortcutCandidateSemicolonQuote,
-  kShortcutCandidateCtrl,
+  kShortcutCandidateNumpad,
   kShortcutCount,
 };
 
@@ -45,8 +44,7 @@ inline constexpr std::array<const char *, kShortcutCount> shortcutKeys = {
     "shortcut_full_half_switch",   "shortcut_punctuation_switch",
     "shortcut_traditional_switch", "shortcut_page_minus_equal",
     "shortcut_page_brackets",      "shortcut_page_comma_period",
-    "shortcut_page_shift_tab",     "shortcut_candidate_semicolon_quote",
-    "shortcut_candidate_ctrl",
+    "shortcut_page_shift_tab",     "shortcut_candidate_numpad",
 };
 
 struct PunctuationEntry {

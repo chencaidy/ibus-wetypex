@@ -852,6 +852,28 @@ void selectCandidate(EngineState *state, int index, bool pageRelative = false) {
   updateUi(state);
 }
 
+bool processCandidateSelectionKey(EngineState *state, guint keyval) {
+  if (keyval == IBUS_KEY_space) {
+    selectCandidate(state, -1);
+    return TRUE;
+  }
+  if (keyval >= IBUS_KEY_1 && keyval <= IBUS_KEY_9) {
+    const guint digit = keyval - IBUS_KEY_1;
+    if (digit < static_cast<guint>(state->settings.pageSize)) {
+      selectCandidate(state, static_cast<int>(digit), true);
+      return TRUE;
+    }
+  }
+  if (keyval >= IBUS_KEY_KP_1 && keyval <= IBUS_KEY_KP_9 && state->settings.shortcuts[kShortcutCandidateNumpad]) {
+    const guint digit = keyval - IBUS_KEY_KP_1;
+    if (digit < static_cast<guint>(state->settings.pageSize)) {
+      selectCandidate(state, static_cast<int>(digit), true);
+      return TRUE;
+    }
+  }
+  return false;
+}
+
 void changeCandidatePage(EngineState *state, int direction) {
   const int pageCount =
       static_cast<int>((state->candidates.size() + state->settings.pageSize - 1) / state->settings.pageSize);
@@ -1129,19 +1151,8 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
       return TRUE;
     }
 
-    if (keyval == IBUS_KEY_space) {
-      selectCandidate(state, -1);
+    if (processCandidateSelectionKey(state, keyval))
       return TRUE;
-    }
-
-    if ((keyval >= IBUS_KEY_1 && keyval <= IBUS_KEY_9) || (keyval >= IBUS_KEY_KP_1 && keyval <= IBUS_KEY_KP_9)) {
-      const guint digit = keyval >= IBUS_KEY_KP_1 ? keyval - IBUS_KEY_KP_1 : keyval - IBUS_KEY_1;
-      if (digit < static_cast<guint>(state->settings.pageSize)) {
-        selectCandidate(state, static_cast<int>(digit), true);
-        return TRUE;
-      }
-      return FALSE;
-    }
 
     if (keyval == IBUS_KEY_BackSpace) {
       if (state->cursor > state->editableBegin) {
@@ -1203,6 +1214,7 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
   if ((cleanModifiers & IBUS_SHIFT_MASK) && unicode >= 'a' && unicode <= 'z')
     unicode -= 'a' - 'A';
   const bool letter = (unicode >= 'a' && unicode <= 'z') || (unicode >= 'A' && unicode <= 'Z');
+  const bool number = (unicode >= '0' && unicode <= '9');
   const bool separator = unicode == '\'' && !state->preedit.empty() && state->settings.inputMode != "wubi";
 
   if (state->english) {
@@ -1215,7 +1227,7 @@ gboolean onProcessKey(IBusEngine *engine, guint keyval, guint keycode, guint mod
       commitFullWidthAscii(engine, unicode))
     return TRUE;
 
-  if (letter || separator) {
+  if (letter || number || separator) {
     char text[2] = {static_cast<char>(unicode), '\0'};
     state->cursor = std::min(state->cursor, state->preedit.size());
     state->preedit.insert(state->cursor, text, 1);

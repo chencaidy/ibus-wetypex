@@ -137,8 +137,7 @@ inline constexpr const char *kPageCommaPeriodTitle = "逗号句号";
 inline constexpr const char *kPageShiftTabTitle = "Shift + Tab / Tab";
 
 inline constexpr const char *kGroupCandidateSelection = "候选词选择";
-inline constexpr const char *kCandidateSemicolonQuoteTitle = "使用分号、引号选择第 2 位、第 3 位候选词";
-inline constexpr const char *kCandidateCtrlTitle = "使用左、右 Ctrl 选择第 2 位、第 3 位候选词";
+inline constexpr const char *kCandidateNumpadTitle = "使用小键盘数字键选择候选词";
 
 // ---- 跨设备页 ----
 inline constexpr const char *kDevicesGroupTitle = "跨设备";
