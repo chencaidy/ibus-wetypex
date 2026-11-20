@@ -53,6 +53,11 @@ struct GrpcInfo {
 
 std::string data_root() { return std::string(g_get_user_data_dir()) + "/wetypex"; }
 
+std::string receive_directory() {
+  const char *downloads = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);
+  return std::string(downloads ? downloads : g_get_home_dir()) + "/WeTypeX";
+}
+
 std::string transfer_asset(const char *directory, const char *name) {
   return data_root() + "/ui/" + directory + "/" + name;
 }
@@ -359,39 +364,13 @@ public:
   void load_devices() {
     adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(devices_group_), kLoadingDevices);
     run_account({"group-info"}, [self = shared_from_this()](json_object *result) {
-      self->clear_device_list();
-
       if (!result) {
+        self->clear_device_list();
+        self->device_snapshot_.clear();
         adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(self->devices_group_), kDevicesUnavailable);
         return;
       }
-
-      json_object *devices = json_child(result, "devices");
-      const int64_t own_uin = json_integer(result, "self_uin");
-      bool has_devices = false;
-      if (devices && json_object_is_type(devices, json_type_array)) {
-        const size_t count = json_object_array_length(devices);
-        for (size_t i = 0; i < count; ++i) {
-          json_object *device = json_object_array_get_idx(devices, i);
-          const int64_t uin = json_integer(device, "uin");
-          if (uin <= 0 || uin == own_uin)
-            continue;
-          const int platform = static_cast<int>(json_integer(device, "platform"));
-          const char *icon = platform == 1 || platform == 2 ? "phone-symbolic" : "computer-symbolic";
-          GtkWidget *row = self->make_device_row(json_string(device, "name"), nullptr, icon,
-                                                 [self, uin] { self->start_device_transfer(uin); });
-          adw_preferences_group_add(ADW_PREFERENCES_GROUP(self->devices_group_), row);
-          self->device_rows_.push_back(row);
-          has_devices = true;
-        }
-      }
-      const char *label = has_devices ? kSelectDeviceDescription : kNoPairedDevices;
-      adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(self->devices_group_), label);
-
-      GtkWidget *pair = self->make_device_row(kPairOtherDevices, nullptr, "preferences-system-symbolic",
-                                              [self] { self->open_settings(); });
-      adw_preferences_group_add(ADW_PREFERENCES_GROUP(self->devices_group_), pair);
-      self->device_rows_.push_back(pair);
+      self->update_devices(json_child(result, "devices"), json_integer(result, "self_uin"));
     });
   }
 
@@ -605,19 +584,18 @@ private:
       adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle);
     GtkWidget *image = gtk_image_new_from_icon_name(icon);
     adw_action_row_add_prefix(ADW_ACTION_ROW(row), image);
-    GtkWidget *arrow = gtk_button_new_from_icon_name("go-next-symbolic");
-    gtk_widget_add_css_class(arrow, "flat");
+    GtkWidget *arrow = gtk_image_new_from_icon_name("go-next-symbolic");
     gtk_widget_set_valign(arrow, GTK_ALIGN_CENTER);
     adw_action_row_add_suffix(ADW_ACTION_ROW(row), arrow);
-    adw_action_row_set_activatable_widget(ADW_ACTION_ROW(row), arrow);
-    g_object_set_data_full(G_OBJECT(arrow), "activate", new std::function<void()>(std::move(activate)),
+    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), TRUE);
+    g_object_set_data_full(G_OBJECT(row), "activate", new std::function<void()>(std::move(activate)),
                            [](gpointer data) { delete static_cast<std::function<void()> *>(data); });
-    g_signal_connect(arrow, "clicked", G_CALLBACK(on_action_row_clicked), nullptr);
+    g_signal_connect(row, "activated", G_CALLBACK(on_action_row_activated), nullptr);
     return row;
   }
 
-  static void on_action_row_clicked(GtkButton *button, gpointer) {
-    auto *activate = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(button), "activate"));
+  static void on_action_row_activated(AdwActionRow *row, gpointer) {
+    auto *activate = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(row), "activate"));
     if (activate)
       (*activate)();
   }
@@ -626,6 +604,53 @@ private:
     for (GtkWidget *row : device_rows_)
       adw_preferences_group_remove(ADW_PREFERENCES_GROUP(devices_group_), row);
     device_rows_.clear();
+  }
+
+  void update_devices(json_object *devices, int64_t own_uin) {
+    json_object *snapshot = json_object_new_array();
+    if (devices && json_object_is_type(devices, json_type_array)) {
+      std::vector<int64_t> seen;
+      const size_t count = json_object_array_length(devices);
+      for (size_t i = 0; i < count; ++i) {
+        json_object *device = json_object_array_get_idx(devices, i);
+        const int64_t uin = json_integer(device, "uin");
+        if (uin <= 0 || uin == own_uin || std::find(seen.begin(), seen.end(), uin) != seen.end())
+          continue;
+        seen.push_back(uin);
+        const char *name = json_string(device, "name");
+        json_object *row = new_object();
+        json_object_object_add(row, "uin", json_object_new_int64(uin));
+        add_string(row, "name", *name ? name : "关联设备");
+        json_object_object_add(row, "platform", json_object_new_int64(json_integer(device, "platform")));
+        json_object_array_add(snapshot, row);
+      }
+    }
+    const char *serialized = json_object_to_json_string_ext(snapshot, JSON_C_TO_STRING_PLAIN);
+    const std::string snapshot_text = serialized ? serialized : "[]";
+    if (snapshot_text == device_snapshot_) {
+      json_object_put(snapshot);
+      return;
+    }
+    device_snapshot_ = snapshot_text;
+    clear_device_list();
+    const size_t count = json_object_array_length(snapshot);
+    for (size_t i = 0; i < count; ++i) {
+      json_object *device = json_object_array_get_idx(snapshot, i);
+      const int64_t uin = json_integer(device, "uin");
+      const int platform = static_cast<int>(json_integer(device, "platform"));
+      const char *icon = platform == 1 || platform == 2 ? "phone-symbolic" : "computer-symbolic";
+      GtkWidget *row = make_device_row(json_string(device, "name"), nullptr, icon,
+                                       [self = shared_from_this(), uin] { self->start_device_transfer(uin); });
+      adw_preferences_group_add(ADW_PREFERENCES_GROUP(devices_group_), row);
+      device_rows_.push_back(row);
+    }
+    const char *label = count ? kSelectDeviceDescription : kNoPairedDevices;
+    adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(devices_group_), label);
+    GtkWidget *pair = make_device_row(kPairOtherDevices, nullptr, "preferences-system-symbolic",
+                                      [self = shared_from_this()] { self->open_settings(); });
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(devices_group_), pair);
+    device_rows_.push_back(pair);
+    json_object_put(snapshot);
   }
 
   static std::string invite_key(int64_t self, int64_t sender, const std::string &code) {
@@ -708,6 +733,7 @@ private:
       if (!devices || !json_object_is_type(devices, json_type_array) || !invites ||
           !json_object_is_type(invites, json_type_array))
         return;
+      self->update_devices(devices, own_uin);
       const size_t count = json_object_array_length(invites);
       for (size_t i = 0; i < count; ++i) {
         json_object *invite = json_object_array_get_idx(invites, i);
@@ -772,26 +798,25 @@ private:
     gtk_widget_set_margin_end(progress_, 16);
     adw_preferences_group_add(ADW_PREFERENCES_GROUP(group), progress_);
 
-    send_actions_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    GtkWidget *send_file_button = gtk_button_new_with_label(kSendFile);
-    GtkWidget *send_directory_button = gtk_button_new_with_label(kSendDirectory);
-    g_signal_connect_swapped(send_file_button, "clicked", G_CALLBACK(on_choose_files), this);
-    g_signal_connect_swapped(send_directory_button, "clicked", G_CALLBACK(on_choose_directory), this);
-    gtk_box_set_homogeneous(GTK_BOX(send_actions_), TRUE);
-    gtk_widget_set_hexpand(send_file_button, TRUE);
-    gtk_widget_set_hexpand(send_directory_button, TRUE);
-    gtk_widget_set_margin_top(send_actions_, 8);
-    gtk_widget_set_margin_bottom(send_actions_, 12);
-    gtk_widget_set_margin_start(send_actions_, 12);
-    gtk_widget_set_margin_end(send_actions_, 12);
-    gtk_widget_set_hexpand(send_actions_, TRUE);
-    gtk_box_append(GTK_BOX(send_actions_), send_file_button);
-    gtk_box_append(GTK_BOX(send_actions_), send_directory_button);
+    GtkWidget *send_actions = adw_preferences_group_new();
+    send_actions_ = send_actions;
+    GtkWidget *send_file_row =
+        make_device_row(kSendFile, nullptr, "document-send-symbolic", [this] { on_choose_files(this); });
+    GtkWidget *send_directory_row =
+        make_device_row(kSendDirectory, nullptr, "folder-symbolic", [this] { on_choose_directory(this); });
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(send_actions), send_file_row);
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(send_actions), send_directory_row);
     gtk_widget_set_sensitive(send_actions_, FALSE);
     adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(group));
 
+    GtkWidget *receive_actions = adw_preferences_group_new();
+    GtkWidget *open_folder =
+        make_device_row(kOpenReceiveDirectory, nullptr, "folder-symbolic", [this] { open_receive_directory(); });
+    adw_preferences_group_add(ADW_PREFERENCES_GROUP(receive_actions), open_folder);
+    adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(receive_actions));
+    adw_preferences_page_add(ADW_PREFERENCES_PAGE(page), ADW_PREFERENCES_GROUP(send_actions_));
+
     adw_view_stack_add_named(ADW_VIEW_STACK(stack_), page, "transfer");
-    adw_toolbar_view_add_bottom_bar(ADW_TOOLBAR_VIEW(toolbar_), send_actions_);
     gtk_widget_set_visible(send_actions_, FALSE);
   }
 
@@ -817,6 +842,25 @@ private:
   }
 
   void set_status(const std::string &text) { gtk_label_set_text(GTK_LABEL(status_), text.c_str()); }
+
+  void open_receive_directory() {
+    const std::string path = receive_directory();
+    if (g_mkdir_with_parents(path.c_str(), 0700) != 0) {
+      set_status(kCreateTransferDirectoryFailed);
+      return;
+    }
+    GError *error = nullptr;
+    gchar *uri = g_filename_to_uri(path.c_str(), nullptr, &error);
+    if (!uri) {
+      set_status(std::string(kOpenReceiveDirectoryFailedPrefix) + (error ? error->message : kUnknownError));
+      g_clear_error(&error);
+      return;
+    }
+    if (!g_app_info_launch_default_for_uri(uri, nullptr, &error))
+      set_status(std::string(kOpenReceiveDirectoryFailedPrefix) + (error ? error->message : kUnknownError));
+    g_free(uri);
+    g_clear_error(&error);
+  }
 
   void open_settings() {
     const char *argv[] = {WETYPE_SETTINGS, nullptr};
@@ -877,8 +921,7 @@ private:
     const std::string runtime = env_or("WETYPE_FLURRY_RUNTIME", root + "/runtime/flurry");
     const std::string host = env_or("WETYPE_ENGINE_HOST", WETYPE_ENGINE_HOST);
     const std::string state = root + "/state/transfer";
-    const char *downloads_dir = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);
-    const std::string downloads = std::string(downloads_dir ? downloads_dir : g_get_home_dir()) + "/WeTypeX";
+    const std::string downloads = receive_directory();
     const std::string parts = state + "/parts";
     if (g_mkdir_with_parents(parts.c_str(), 0700) != 0 || g_mkdir_with_parents(downloads.c_str(), 0700) != 0) {
       set_status(kCreateTransferDirectoryFailed);
@@ -1051,8 +1094,7 @@ private:
     g_subprocess_launcher_setenv(launcher, "WETYPE_AUX_RUNTIME", wxp2p.c_str(), TRUE);
     g_subprocess_launcher_setenv(launcher, "WETYPE_WXP2P_DISPATCH_FILE", dispatch_path.c_str(), TRUE);
     g_subprocess_launcher_setenv(launcher, "WETYPE_FLURRY_REMOTE_CA_FILE", ca_path.c_str(), TRUE);
-    const char *downloads_dir = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);
-    const std::string downloads = std::string(downloads_dir ? downloads_dir : g_get_home_dir()) + "/WeTypeX";
+    const std::string downloads = receive_directory();
     g_subprocess_launcher_setenv(launcher, "WETYPE_SUPPORT_DIR", WETYPE_SUPPORT_DIR, TRUE);
     g_subprocess_launcher_setenv(launcher, "WETYPE_FLURRY_DOWNLOAD_DIR", downloads.c_str(), TRUE);
     g_subprocess_launcher_setenv(launcher, "WETYPE_FLURRY_TEMP_DIR", (state + "/parts").c_str(), TRUE);
@@ -1368,6 +1410,7 @@ private:
   GtkWidget *stack_ = nullptr;
   GtkWidget *devices_group_ = nullptr;
   std::vector<GtkWidget *> device_rows_;
+  std::string device_snapshot_;
   GtkWidget *title_ = nullptr;
   GtkWidget *qr_ = nullptr;
   GtkWidget *status_ = nullptr;
