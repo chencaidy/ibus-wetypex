@@ -300,6 +300,7 @@ json_object *parse_json(const char *text, gssize length = -1) {
 class TransferWindow : public std::enable_shared_from_this<TransferWindow> {
 public:
   explicit TransferWindow(AdwApplication *application) {
+    load_invite_history();
     window_ = adw_application_window_new(GTK_APPLICATION(application));
     gtk_window_set_title(GTK_WINDOW(window_), kAppTitle);
     gtk_window_set_default_size(GTK_WINDOW(window_), 360, 540);
@@ -327,11 +328,24 @@ public:
       g_idle_add(on_direct_start, this);
   }
 
-  ~TransferWindow() { stop_session(); }
+  ~TransferWindow() {
+    if (invitation_timer_)
+      g_source_remove(invitation_timer_);
+    if (initial_invitation_poll_)
+      g_source_remove(initial_invitation_poll_);
+    if (invite_history_)
+      json_object_put(invite_history_);
+    stop_session();
+  }
 
   void present() { gtk_window_present(GTK_WINDOW(window_)); }
 
   GtkWidget *widget() const { return window_; }
+
+  void start_invitation_polling() {
+    invitation_timer_ = g_timeout_add_seconds(3, on_invitation_timer, this);
+    initial_invitation_poll_ = g_idle_add(on_initial_invitation_poll, this);
+  }
 
   void load_devices() {
     adw_preferences_group_set_description(ADW_PREFERENCES_GROUP(devices_group_), kLoadingDevices);
@@ -408,6 +422,18 @@ private:
 
   static gboolean on_poll_timer(gpointer data) {
     static_cast<TransferWindow *>(data)->poll_peer();
+    return G_SOURCE_CONTINUE;
+  }
+
+  static gboolean on_initial_invitation_poll(gpointer data) {
+    auto *self = static_cast<TransferWindow *>(data);
+    self->initial_invitation_poll_ = 0;
+    self->poll_pending_invites();
+    return G_SOURCE_REMOVE;
+  }
+
+  static gboolean on_invitation_timer(gpointer data) {
+    static_cast<TransferWindow *>(data)->poll_pending_invites();
     return G_SOURCE_CONTINUE;
   }
 
@@ -546,6 +572,117 @@ private:
     device_rows_.clear();
   }
 
+  static std::string invite_key(int64_t self, int64_t sender, const std::string &code) {
+    const std::string value = std::to_string(self) + ":" + std::to_string(sender) + ":" + code;
+    gchar *checksum = g_compute_checksum_for_string(G_CHECKSUM_SHA256, value.c_str(), value.size());
+    std::string key = checksum ? checksum : "";
+    g_free(checksum);
+    return key;
+  }
+
+  void load_invite_history() {
+    const std::string path = invite_history_path();
+    struct stat info{};
+    if (stat(path.c_str(), &info) != 0 || info.st_size > 32768)
+      return;
+    gchar *contents = nullptr;
+    gsize length = 0;
+    if (!g_file_get_contents(path.c_str(), &contents, &length, nullptr))
+      return;
+    json_object *history = parse_json(contents, static_cast<gssize>(length));
+    g_free(contents);
+    if (!history || !json_object_is_type(history, json_type_object)) {
+      if (history)
+        json_object_put(history);
+      return;
+    }
+    if (invite_history_)
+      json_object_put(invite_history_);
+    invite_history_ = history;
+    std::vector<std::string> invalid;
+    json_object_object_foreach(invite_history_, key, value) {
+      if (std::strlen(key) != 64 || json_object_get_int64(value) <= 0)
+        invalid.emplace_back(key);
+    }
+    for (const auto &key : invalid)
+      json_object_object_del(invite_history_, key.c_str());
+  }
+
+  static std::string invite_history_path() { return data_root() + "/state/transfer/handled-invites.json"; }
+
+  void remember_invite(const std::string &key) {
+    if (key.empty())
+      return;
+    while (json_object_object_length(invite_history_) >= 128) {
+      std::string oldest;
+      int64_t oldest_time = INT64_MAX;
+      json_object_object_foreach(invite_history_, candidate, value) {
+        const int64_t timestamp = json_object_get_int64(value);
+        if (timestamp <= oldest_time) {
+          oldest = candidate;
+          oldest_time = timestamp;
+        }
+      }
+      if (oldest.empty())
+        break;
+      json_object_object_del(invite_history_, oldest.c_str());
+    }
+    json_object_object_add(invite_history_, key.c_str(), json_object_new_int64(g_get_real_time() / 1000));
+    const std::string path = invite_history_path();
+    const std::string directory = data_root() + "/state/transfer";
+    if (g_mkdir_with_parents(directory.c_str(), 0700) != 0) {
+      g_warning("Cannot create %s: %s", directory.c_str(), g_strerror(errno));
+      return;
+    }
+    const char *serialized = json_object_to_json_string_ext(invite_history_, JSON_C_TO_STRING_PLAIN);
+    write_private(path, serialized ? serialized : "{}");
+  }
+
+  void poll_pending_invites() {
+    if (closing_ || account_busy_ || session_ ||
+        g_strcmp0(adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(stack_)), "home") != 0)
+      return;
+    run_account({"pending-file-invite"}, [self = shared_from_this()](json_object *result) {
+      if (!result || !json_boolean(result, "ok") || self->closing_ || self->session_ ||
+          g_strcmp0(adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(self->stack_)), "home") != 0)
+        return;
+      const int64_t own_uin = json_integer(result, "self_uin");
+      json_object *devices = json_child(result, "devices");
+      json_object *invites = json_child(result, "pending_invites");
+      if (!devices || !json_object_is_type(devices, json_type_array) || !invites ||
+          !json_object_is_type(invites, json_type_array))
+        return;
+      const size_t count = json_object_array_length(invites);
+      for (size_t i = 0; i < count; ++i) {
+        json_object *invite = json_object_array_get_idx(invites, i);
+        const int64_t sender = json_integer(invite, "sender_uin");
+        const std::string code = json_string(invite, "transfer_code");
+        const std::string key = invite_key(own_uin, sender, code);
+        if (sender <= 0 || sender == own_uin || code.empty() ||
+            json_object_object_get(self->invite_history_, key.c_str()))
+          continue;
+        std::string device_name;
+        const size_t device_count = json_object_array_length(devices);
+        for (size_t device_index = 0; device_index < device_count; ++device_index) {
+          json_object *device = json_object_array_get_idx(devices, device_index);
+          if (json_integer(device, "uin") == sender) {
+            device_name = json_string(device, "name");
+            break;
+          }
+        }
+        if (device_name.empty())
+          continue;
+        self->remember_invite(key);
+        self->incoming_code_ = code;
+        self->bound_uin_ = std::to_string(sender);
+        self->bound_device_name_ = device_name;
+        self->show_transfer_page(false, true);
+        self->start_session();
+        break;
+      }
+    });
+  }
+
   void build_transfer_page() {
     GtkWidget *page = adw_preferences_page_new();
     GtkWidget *group = adw_preferences_group_new();
@@ -614,7 +751,7 @@ private:
     }
   }
 
-  void show_transfer_page(bool show_qr) {
+  void show_transfer_page(bool show_qr, bool receiving_invite = false) {
     adw_view_stack_set_visible_child_name(ADW_VIEW_STACK(stack_), "transfer");
     gtk_widget_set_visible(back_button_, TRUE);
     gtk_widget_set_visible(send_actions_, TRUE);
@@ -622,10 +759,10 @@ private:
     gtk_widget_set_visible(progress_, FALSE);
     gtk_widget_set_sensitive(send_actions_, FALSE);
     if (!show_qr) {
-      gtk_label_set_text(GTK_LABEL(title_), kAppTitle);
+      gtk_label_set_text(GTK_LABEL(title_), bound_device_name_.empty() ? kAppTitle : bound_device_name_.c_str());
       gtk_picture_set_filename(GTK_PICTURE(qr_),
                                transfer_asset("transfer-images", "img_connection_pc_to_phone.png").c_str());
-      set_status(kInvitingPairedDevice);
+      set_status(receiving_invite ? kAcceptingFileInvite : kInvitingPairedDevice);
     }
     gtk_window_present(GTK_WINDOW(window_));
   }
@@ -723,7 +860,9 @@ private:
       ++account_request_id_;
     }
     transfer_code_.clear();
+    incoming_code_.clear();
     bound_uin_.clear();
+    bound_device_name_.clear();
     last_dispatch_.clear();
     wxp_started_ = false;
     grpc_advertised_ = false;
@@ -807,7 +946,7 @@ private:
       stop_polling();
       gtk_picture_set_filename(GTK_PICTURE(qr_),
                                transfer_asset("transfer-images", "img_connection_pc_to_phone.png").c_str());
-      gtk_label_set_text(GTK_LABEL(title_), kAppTitle);
+      gtk_label_set_text(GTK_LABEL(title_), bound_device_name_.empty() ? kAppTitle : bound_device_name_.c_str());
       set_status(kConnectedCanTransfer);
       gtk_widget_set_sensitive(send_actions_, TRUE);
     } else if (type == "disconnected") {
@@ -870,25 +1009,27 @@ private:
       set_status(kSaveTransferSessionFailed);
       return;
     }
+    const bool receiving = !incoming_code_.empty();
     std::vector<std::string> arguments;
-    if (bound_uin_.empty())
+    if (receiving)
+      arguments = {"p2p-update", incoming_code_, path};
+    else if (bound_uin_.empty())
       arguments = {"p2p-code", path};
     else
       arguments = {"p2p-init", bound_uin_, path};
     run_account(
         arguments,
-        [this](json_object *result) {
+        [this, receiving](json_object *result) {
           if (!result)
             return;
-          const char *code = json_string(result, "transfer_code");
-          transfer_code_ = code;
+          transfer_code_ = receiving ? incoming_code_ : json_string(result, "transfer_code");
           last_dispatch_.clear();
           if (!json_boolean(result, "ok") || transfer_code_.empty() ||
-              (bound_uin_.empty() && !*json_string(result, "transfer_image"))) {
+              (!receiving && bound_uin_.empty() && !*json_string(result, "transfer_image"))) {
             set_status(kCreateTransferQrFailed);
             return;
           }
-          if (bound_uin_.empty())
+          if (!receiving && bound_uin_.empty())
             set_qr_from_base64(json_string(result, "transfer_image"));
           const int minutes = std::max<int64_t>(1, json_integer(result, "expiration") / 60000);
           set_status(std::string(bound_uin_.empty() ? kQrExpiresIn : kInviteExpiresIn) + std::to_string(minutes) +
@@ -1061,9 +1202,14 @@ private:
   GDataInputStream *session_output_ = nullptr;
   GCancellable *session_cancel_ = nullptr;
   guint poll_timer_ = 0;
+  guint invitation_timer_ = 0;
+  guint initial_invitation_poll_ = 0;
   std::string transfer_code_;
+  std::string incoming_code_;
   std::string bound_uin_;
+  std::string bound_device_name_;
   std::string last_dispatch_;
+  json_object *invite_history_ = json_object_new_object();
   bool account_busy_ = false;
   uint64_t account_request_id_ = 0;
   uint64_t session_generation_ = 0;
@@ -1086,6 +1232,7 @@ void on_activate(AdwApplication *application, gpointer) {
                          new std::shared_ptr<TransferWindow>(window),
                          [](gpointer data) { delete static_cast<std::shared_ptr<TransferWindow> *>(data); });
   window->load_devices();
+  window->start_invitation_polling();
   window->present();
 }
 } // namespace

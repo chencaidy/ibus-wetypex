@@ -25,6 +25,7 @@ inline constexpr const char *kSendFile = "传文件";
 inline constexpr const char *kSendDirectory = "传文件夹";
 inline constexpr const char *kInviteDevice = "邀请设备";
 inline constexpr const char *kInvitingPairedDevice = "正在邀请关联设备…";
+inline constexpr const char *kAcceptingFileInvite = "正在接受关联设备的文件邀请…";
 inline constexpr const char *kShowTransferQrFailedPrefix = "无法显示传输二维码：";
 inline constexpr const char *kInvalidImageFormat = "图片格式无效";
 inline constexpr const char *kCreateTransferDirectoryFailed = "无法创建传输目录";
