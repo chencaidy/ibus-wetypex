@@ -335,7 +335,16 @@ public:
       g_source_remove(initial_invitation_poll_);
     if (invite_history_)
       json_object_put(invite_history_);
-    stop_session();
+    if (session_) {
+      send_session("quit");
+      if (session_cancel_)
+        g_cancellable_cancel(session_cancel_);
+      g_subprocess_force_exit(session_);
+      g_subprocess_wait(session_, nullptr, nullptr);
+      g_clear_object(&session_output_);
+      g_clear_object(&session_cancel_);
+      g_clear_object(&session_);
+    }
   }
 
   void present() { gtk_window_present(GTK_WINDOW(window_)); }
@@ -395,11 +404,18 @@ private:
     uint64_t session_generation = 0;
   };
 
+  struct StopContext {
+    std::shared_ptr<TransferWindow> window;
+    GSubprocess *process = nullptr;
+    guint timeout_id = 0;
+  };
+
   static gboolean on_close_request(GtkWindow *, gpointer data) {
     auto *self = static_cast<TransferWindow *>(data);
-    self->closing_ = true;
-    self->disconnect_transfer();
-    return FALSE;
+    if (self->closing_)
+      return TRUE;
+    self->close_window_gracefully();
+    return TRUE;
   }
 
   static gboolean on_direct_start(gpointer data) {
@@ -411,13 +427,43 @@ private:
 
   static void on_back_clicked(GtkButton *, gpointer data) {
     auto *self = static_cast<TransferWindow *>(data);
-    self->disconnect_transfer();
-    adw_view_stack_set_visible_child_name(ADW_VIEW_STACK(self->stack_), "home");
-    gtk_widget_set_visible(self->back_button_, FALSE);
-    gtk_widget_set_visible(self->send_actions_, FALSE);
-    gtk_widget_set_visible(self->progress_, FALSE);
-    gtk_label_set_text(GTK_LABEL(self->header_title_), kAppTitle);
-    gtk_label_set_text(GTK_LABEL(self->title_), kMyQrCode);
+    self->return_to_home();
+  }
+
+  static gboolean on_deferred_close(gpointer data) {
+    std::unique_ptr<std::shared_ptr<TransferWindow>> self(static_cast<std::shared_ptr<TransferWindow> *>(data));
+    gtk_window_destroy(GTK_WINDOW((*self)->window_));
+    return G_SOURCE_REMOVE;
+  }
+
+  static gboolean on_stop_timeout(gpointer data) {
+    auto *context = static_cast<StopContext *>(data);
+    context->timeout_id = 0;
+    g_subprocess_force_exit(context->process);
+    return G_SOURCE_REMOVE;
+  }
+
+  static void on_session_stopped(GObject *source, GAsyncResult *result, gpointer data) {
+    std::unique_ptr<StopContext> context(static_cast<StopContext *>(data));
+    auto *self = context->window.get();
+    GError *error = nullptr;
+    if (!g_subprocess_wait_finish(G_SUBPROCESS(source), result, &error)) {
+      g_warning("Failed to wait for transfer core shutdown: %s", error ? error->message : kUnknownError);
+      g_clear_error(&error);
+    }
+    if (context->timeout_id)
+      g_source_remove(context->timeout_id);
+    if (self->session_ == context->process) {
+      g_clear_object(&self->session_output_);
+      g_clear_object(&self->session_cancel_);
+      g_clear_object(&self->session_);
+    }
+    self->stopping_ = false;
+    g_clear_object(&context->process);
+    auto callbacks = std::move(self->after_session_stop_);
+    self->after_session_stop_.clear();
+    for (auto &callback : callbacks)
+      callback();
   }
 
   static gboolean on_poll_timer(gpointer data) {
@@ -474,7 +520,7 @@ private:
     gchar *line = g_data_input_stream_read_line_finish(G_DATA_INPUT_STREAM(source), result, &length, &error);
     const bool current_stream = G_DATA_INPUT_STREAM(source) == self->session_output_;
     if (line) {
-      if (current_stream && !self->closing_)
+      if (current_stream && !self->closing_ && !self->stopping_)
         self->handle_session_event(line, length);
       g_free(line);
       if (current_stream && !self->closing_ && !self->stopping_ && self->session_)
@@ -739,6 +785,27 @@ private:
     gtk_widget_set_visible(send_actions_, FALSE);
   }
 
+  void close_window_gracefully() {
+    closing_ = true;
+    disconnect_transfer();
+    auto self = shared_from_this();
+    if (session_) {
+      stop_session([self] { gtk_window_destroy(GTK_WINDOW(self->window_)); });
+    } else {
+      g_idle_add(on_deferred_close, new std::shared_ptr<TransferWindow>(std::move(self)));
+    }
+  }
+
+  void return_to_home() {
+    disconnect_transfer();
+    adw_view_stack_set_visible_child_name(ADW_VIEW_STACK(stack_), "home");
+    gtk_widget_set_visible(back_button_, FALSE);
+    gtk_widget_set_visible(send_actions_, FALSE);
+    gtk_widget_set_visible(progress_, FALSE);
+    gtk_label_set_text(GTK_LABEL(header_title_), kAppTitle);
+    gtk_label_set_text(GTK_LABEL(title_), kMyQrCode);
+  }
+
   void set_status(const std::string &text) { gtk_label_set_text(GTK_LABEL(status_), text.c_str()); }
 
   void open_settings() {
@@ -784,8 +851,15 @@ private:
   }
 
   void start_session() {
-    if (session_)
-      stop_session();
+    if (session_) {
+      transfer_active_ = true;
+      const uint64_t generation = ++session_generation_;
+      stop_session([self = shared_from_this(), generation] {
+        if (!self->closing_ && self->transfer_active_ && self->session_generation_ == generation)
+          self->start_session();
+      });
+      return;
+    }
     ++session_generation_;
     transfer_active_ = true;
     const std::string root = data_root();
@@ -834,19 +908,26 @@ private:
                                         on_session_line, new std::shared_ptr<TransferWindow>(shared_from_this()));
   }
 
-  void stop_session() {
+  void stop_session(std::function<void()> callback = {}) {
     stop_polling();
-    if (!session_)
+    if (callback)
+      after_session_stop_.push_back(std::move(callback));
+    if (!session_) {
+      auto callbacks = std::move(after_session_stop_);
+      after_session_stop_.clear();
+      for (auto &pending : callbacks)
+        pending();
+      return;
+    }
+    if (stopping_)
       return;
     stopping_ = true;
+    send_session("quit");
     if (session_cancel_)
       g_cancellable_cancel(session_cancel_);
-    send_session("quit");
-    g_subprocess_force_exit(session_);
-    g_subprocess_wait(session_, nullptr, nullptr);
-    g_clear_object(&session_output_);
-    g_clear_object(&session_cancel_);
-    g_clear_object(&session_);
+    auto *context = new StopContext{shared_from_this(), G_SUBPROCESS(g_object_ref(session_)), 0};
+    context->timeout_id = g_timeout_add(1000, on_stop_timeout, context);
+    g_subprocess_wait_async(session_, nullptr, on_session_stopped, context);
   }
 
   void disconnect_transfer() {
@@ -896,7 +977,13 @@ private:
       send_session("wxp2p_start", "dispatch_path", dispatch_path.c_str(), "remote_ca_file", ca_path.c_str());
       return;
     }
-    stop_session();
+    stop_session([self = shared_from_this(), state, dispatch_path, ca_path, expected_dispatch = dispatch] {
+      if (!self->closing_ && self->transfer_active_ && self->last_dispatch_ == expected_dispatch)
+        self->launch_wxp2p(state, dispatch_path, ca_path);
+    });
+  }
+
+  void launch_wxp2p(const std::string &state, const std::string &dispatch_path, const std::string &ca_path) {
     const std::string root = data_root();
     const std::string runtime = env_or("WETYPE_FLURRY_RUNTIME", root + "/runtime/flurry");
     const std::string host = env_or("WETYPE_ENGINE_HOST", WETYPE_ENGINE_HOST);
@@ -1213,6 +1300,7 @@ private:
   bool account_busy_ = false;
   uint64_t account_request_id_ = 0;
   uint64_t session_generation_ = 0;
+  std::vector<std::function<void()>> after_session_stop_;
   bool transfer_active_ = false;
   bool preloaded_wxp2p_ = false;
   bool wxp_started_ = false;
