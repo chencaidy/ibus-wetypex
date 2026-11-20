@@ -89,6 +89,7 @@ struct EngineState {
   pid_t backendPid = -1;
   guint readSource = 0;
   guint writeSource = 0;
+  guint auxiliaryTextHideSource = 0;
   std::string inbound;
   std::string outbound;
   std::string preedit;
@@ -647,6 +648,36 @@ void resetComposition(EngineState *state, bool sendReset) {
     sendRequest(state, "reset");
 }
 
+void hideAuxiliaryText(EngineState *state) {
+  if (state->auxiliaryTextHideSource) {
+    g_source_remove(state->auxiliaryTextHideSource);
+    state->auxiliaryTextHideSource = 0;
+  }
+  ibus_engine_hide_auxiliary_text(IBUS_ENGINE(state->owner));
+}
+
+void showAuxiliaryText(EngineState *state, const char *message) {
+  if (!state->active)
+    return;
+
+  if (state->auxiliaryTextHideSource) {
+    g_source_remove(state->auxiliaryTextHideSource);
+    state->auxiliaryTextHideSource = 0;
+  }
+  auto *engine = IBUS_ENGINE(state->owner);
+  ibus_engine_update_auxiliary_text(engine, ibus_text_new_from_string(message), TRUE);
+  ibus_engine_show_auxiliary_text(engine);
+  state->auxiliaryTextHideSource = g_timeout_add(
+      1500,
+      [](gpointer userData) -> gboolean {
+        auto *current = static_cast<EngineState *>(userData);
+        current->auxiliaryTextHideSource = 0;
+        ibus_engine_hide_auxiliary_text(IBUS_ENGINE(current->owner));
+        return G_SOURCE_REMOVE;
+      },
+      state);
+}
+
 void updateModeProperty(EngineState *state) {
   if (!state->modeProperty)
     return;
@@ -765,6 +796,7 @@ void activate(EngineState *state) {
     resetComposition(state, true);
     sendRequest(state, "close");
     clearUi(state);
+    hideAuxiliaryText(state);
   }
 }
 
@@ -996,6 +1028,7 @@ bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers
       if (!state->fullHalfShortcutDown) {
         state->settings.fullWidth = !state->settings.fullWidth;
         saveSettings(state->settings);
+        showAuxiliaryText(state, state->settings.fullWidth ? "全角模式" : "半角模式");
       }
       state->fullHalfShortcutDown = true;
       return true;
@@ -1015,6 +1048,7 @@ bool processInputStateShortcut(IBusEngine *engine, guint keyval, guint modifiers
       if (!state->punctuationShortcutDown) {
         state->settings.chinesePunctuation = !state->settings.chinesePunctuation;
         saveSettings(state->settings);
+        showAuxiliaryText(state, state->settings.chinesePunctuation ? "中文标点" : "英文标点");
       }
       state->punctuationShortcutDown = true;
       return true;
@@ -1368,6 +1402,8 @@ void finalize(GObject *object) {
   auto *self = reinterpret_cast<WeTypeEngine *>(object);
   if (self->state) {
     auto *state = self->state;
+    if (state->auxiliaryTextHideSource)
+      g_source_remove(state->auxiliaryTextHideSource);
     if (state->backendPid > 0 && state->active) {
       sendRequest(state, "close");
       usleep(10000);
