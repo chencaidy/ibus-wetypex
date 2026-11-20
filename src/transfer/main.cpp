@@ -408,6 +408,7 @@ private:
     std::shared_ptr<TransferWindow> window;
     GSubprocess *process = nullptr;
     guint timeout_id = 0;
+    bool expected = false;
   };
 
   static gboolean on_close_request(GtkWindow *, gpointer data) {
@@ -447,19 +448,26 @@ private:
     std::unique_ptr<StopContext> context(static_cast<StopContext *>(data));
     auto *self = context->window.get();
     GError *error = nullptr;
-    if (!g_subprocess_wait_finish(G_SUBPROCESS(source), result, &error)) {
+    const gboolean waited = g_subprocess_wait_finish(G_SUBPROCESS(source), result, &error);
+    if (!waited) {
       g_warning("Failed to wait for transfer core shutdown: %s", error ? error->message : kUnknownError);
       g_clear_error(&error);
     }
     if (context->timeout_id)
       g_source_remove(context->timeout_id);
-    if (self->session_ == context->process) {
+    const bool current_session = self->session_ == context->process;
+    if (current_session) {
       g_clear_object(&self->session_output_);
       g_clear_object(&self->session_cancel_);
       g_clear_object(&self->session_);
+      self->session_wait_context_ = nullptr;
+      self->stopping_ = false;
     }
-    self->stopping_ = false;
+    const bool unexpected_exit = current_session && !context->expected && !self->closing_;
+    const bool successful = waited && g_subprocess_get_successful(context->process);
     g_clear_object(&context->process);
+    if (unexpected_exit)
+      self->handle_unexpected_session_exit(successful);
     auto callbacks = std::move(self->after_session_stop_);
     self->after_session_stop_.clear();
     for (auto &callback : callbacks)
@@ -527,9 +535,11 @@ private:
         g_data_input_stream_read_line_async(G_DATA_INPUT_STREAM(source), G_PRIORITY_DEFAULT, self->session_cancel_,
                                             on_session_line,
                                             new std::shared_ptr<TransferWindow>(context->get()->shared_from_this()));
-    } else if (current_stream && !self->closing_ && error &&
-               !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
-      self->set_status(std::string(kReadTransferStatusFailedPrefix) + error->message);
+    } else if (current_stream && !self->closing_) {
+      if (error && !g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        self->set_status(std::string(kReadTransferStatusFailedPrefix) + error->message);
+      else if (!self->stopping_)
+        self->watch_session_exit();
     }
     g_clear_error(&error);
   }
@@ -862,6 +872,7 @@ private:
     }
     ++session_generation_;
     transfer_active_ = true;
+    invite_deadline_ = 0;
     const std::string root = data_root();
     const std::string runtime = env_or("WETYPE_FLURRY_RUNTIME", root + "/runtime/flurry");
     const std::string host = env_or("WETYPE_ENGINE_HOST", WETYPE_ENGINE_HOST);
@@ -906,7 +917,28 @@ private:
     session_output_ = g_data_input_stream_new(stream);
     g_data_input_stream_read_line_async(G_DATA_INPUT_STREAM(session_output_), G_PRIORITY_DEFAULT, session_cancel_,
                                         on_session_line, new std::shared_ptr<TransferWindow>(shared_from_this()));
+    watch_session_exit();
   }
+
+  void wait_for_session_exit(bool expected) {
+    if (!session_)
+      return;
+    if (session_wait_context_) {
+      if (expected) {
+        session_wait_context_->expected = true;
+        if (!session_wait_context_->timeout_id)
+          session_wait_context_->timeout_id = g_timeout_add(1000, on_stop_timeout, session_wait_context_);
+      }
+      return;
+    }
+    auto *context = new StopContext{shared_from_this(), G_SUBPROCESS(g_object_ref(session_)), 0, expected};
+    session_wait_context_ = context;
+    if (expected)
+      context->timeout_id = g_timeout_add(1000, on_stop_timeout, context);
+    g_subprocess_wait_async(session_, nullptr, on_session_stopped, context);
+  }
+
+  void watch_session_exit() { wait_for_session_exit(false); }
 
   void stop_session(std::function<void()> callback = {}) {
     stop_polling();
@@ -919,15 +951,39 @@ private:
         pending();
       return;
     }
-    if (stopping_)
+    if (!stopping_) {
+      stopping_ = true;
+      send_session("quit");
+      if (session_cancel_)
+        g_cancellable_cancel(session_cancel_);
+    }
+    wait_for_session_exit(true);
+  }
+
+  void handle_unexpected_session_exit(bool successful) {
+    if (!transfer_active_)
       return;
-    stopping_ = true;
-    send_session("quit");
-    if (session_cancel_)
-      g_cancellable_cancel(session_cancel_);
-    auto *context = new StopContext{shared_from_this(), G_SUBPROCESS(g_object_ref(session_)), 0};
-    context->timeout_id = g_timeout_add(1000, on_stop_timeout, context);
-    g_subprocess_wait_async(session_, nullptr, on_session_stopped, context);
+    stop_polling();
+    transfer_active_ = false;
+    ++session_generation_;
+    if (account_process_) {
+      g_subprocess_force_exit(account_process_);
+      g_clear_object(&account_process_);
+      account_busy_ = false;
+      ++account_request_id_;
+    }
+    transfer_code_.clear();
+    invite_deadline_ = 0;
+    incoming_code_.clear();
+    bound_uin_.clear();
+    bound_device_name_.clear();
+    last_dispatch_.clear();
+    wxp_started_ = false;
+    grpc_advertised_ = false;
+    gtk_widget_set_sensitive(send_actions_, FALSE);
+    gtk_widget_set_visible(progress_, FALSE);
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0.0);
+    set_status(successful ? kTransferCoreEnded : kTransferCoreExited);
   }
 
   void disconnect_transfer() {
@@ -941,6 +997,7 @@ private:
       ++account_request_id_;
     }
     transfer_code_.clear();
+    invite_deadline_ = 0;
     incoming_code_.clear();
     bound_uin_.clear();
     bound_device_name_.clear();
@@ -1013,6 +1070,7 @@ private:
     session_output_ = g_data_input_stream_new(g_subprocess_get_stdout_pipe(session_));
     g_data_input_stream_read_line_async(G_DATA_INPUT_STREAM(session_output_), G_PRIORITY_DEFAULT, session_cancel_,
                                         on_session_line, new std::shared_ptr<TransferWindow>(shared_from_this()));
+    watch_session_exit();
     set_status(kConnectingToPhone);
     wxp_started_ = true;
   }
@@ -1037,10 +1095,7 @@ private:
       set_status(kConnectedCanTransfer);
       gtk_widget_set_sensitive(send_actions_, TRUE);
     } else if (type == "disconnected") {
-      set_status(kDeviceDisconnected);
-      gtk_widget_set_sensitive(send_actions_, FALSE);
-      if (!transfer_code_.empty())
-        start_polling();
+      return_to_home();
     } else if (type == "connect_end") {
       set_status(kConnectionRetrying);
       gtk_widget_set_sensitive(send_actions_, FALSE);
@@ -1065,6 +1120,10 @@ private:
       }
     } else if (type == "start_failed") {
       set_status(kUnableToEstablishSecureConnection);
+    } else if (type == "read_error") {
+      gtk_widget_set_visible(progress_, FALSE);
+      const char *reason = json_string(event, "error");
+      set_status(*reason ? std::string(kReadSelectedFileFailedPrefix) + reason : kReadSelectedFileFailed);
     }
     json_object_put(event);
   }
@@ -1118,7 +1177,9 @@ private:
           }
           if (!receiving && bound_uin_.empty())
             set_qr_from_base64(json_string(result, "transfer_image"));
-          const int minutes = std::max<int64_t>(1, json_integer(result, "expiration") / 60000);
+          const int64_t expiration = json_integer(result, "expiration");
+          invite_deadline_ = expiration > 0 ? g_get_real_time() / 1000 + std::min<int64_t>(expiration, 86400000) : 0;
+          const int minutes = std::max<int64_t>(1, expiration / 60000);
           set_status(std::string(bound_uin_.empty() ? kQrExpiresIn : kInviteExpiresIn) + std::to_string(minutes) +
                      kMinutesUntilExpiry);
           start_polling();
@@ -1127,14 +1188,42 @@ private:
   }
 
   void poll_peer() {
-    if (account_busy_ || transfer_code_.empty())
+    if (transfer_code_.empty())
+      return;
+    if (invite_deadline_ > 0 && g_get_real_time() / 1000 >= invite_deadline_) {
+      stop_polling();
+      disconnect_transfer();
+      set_status(kInviteExpired);
+      return;
+    }
+    if (account_busy_)
       return;
     run_account(
         {"p2p-peer", transfer_code_},
         [this](json_object *result) {
           if (!result || !json_boolean(result, "ok"))
             return;
+          if (invite_deadline_ > 0 && g_get_real_time() / 1000 >= invite_deadline_) {
+            stop_polling();
+            disconnect_transfer();
+            set_status(kInviteExpired);
+            return;
+          }
           json_object *peer = json_child(result, "peer");
+          const int state = static_cast<int>(json_integer(peer, "state"));
+          if (state == 1 || state == 2 || state == 4) {
+            stop_polling();
+            disconnect_transfer();
+            set_status(state == 1 ? kPeerCancelledTransfer : kPeerEndedTransfer);
+            return;
+          }
+          const int64_t peer_uin = json_integer(peer, "uin");
+          if (!bound_uin_.empty() && peer_uin > 0 && std::to_string(peer_uin) != bound_uin_) {
+            stop_polling();
+            disconnect_transfer();
+            set_status(kPeerIdentityMismatch);
+            return;
+          }
           const std::string dispatch = decode_base64(json_string(result, "dispatch_buf"));
           if (!dispatch.empty()) {
             start_wxp2p(dispatch, peer);
@@ -1288,11 +1377,13 @@ private:
   GSubprocess *account_process_ = nullptr;
   GDataInputStream *session_output_ = nullptr;
   GCancellable *session_cancel_ = nullptr;
+  StopContext *session_wait_context_ = nullptr;
   guint poll_timer_ = 0;
   guint invitation_timer_ = 0;
   guint initial_invitation_poll_ = 0;
   std::string transfer_code_;
   std::string incoming_code_;
+  int64_t invite_deadline_ = 0;
   std::string bound_uin_;
   std::string bound_device_name_;
   std::string last_dispatch_;
