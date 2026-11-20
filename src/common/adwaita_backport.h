@@ -204,6 +204,15 @@ static inline GtkWidget *wetypex_entry_row_new() {
 #define adw_entry_row_new() wetypex_entry_row_new()
 #endif
 
+static inline void wetypex_switch_row_connect_active_notify(GtkWidget *row, GCallback callback) {
+#if ADW_CHECK_VERSION(1, 4, 0)
+  g_signal_connect(row, "notify::active", callback, nullptr);
+#else
+  auto *toggle = static_cast<GtkWidget *>(g_object_get_data(G_OBJECT(row), "wetypex-switch"));
+  g_signal_connect_object(toggle, "notify::active", callback, row, G_CONNECT_SWAPPED);
+#endif
+}
+
 static inline GtkWidget *wetypex_entry_row_get_entry(GtkWidget *row) {
 #if ADW_CHECK_VERSION(1, 4, 0)
   return row;

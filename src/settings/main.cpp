@@ -104,7 +104,7 @@ GtkWidget *switch_row(const char *title, const char *subtitle, const char *key, 
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle);
   adw_switch_row_set_active(ADW_SWITCH_ROW(row), setting_bool(settings.get(), key, fallback));
   g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(key), g_free);
-  g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify), nullptr);
+  wetypex_switch_row_connect_active_notify(row, G_CALLBACK(on_switch_notify));
   if (std::strcmp(key, "standalone") == 0)
     app.standalone_switch = row;
   return row;
@@ -173,7 +173,7 @@ void add_switch_rows(GtkWidget *expander, const std::vector<SwitchOption> &optio
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), option.label);
     adw_switch_row_set_active(ADW_SWITCH_ROW(row), setting_bool(settings, option.key, false));
     g_object_set_data_full(G_OBJECT(row), "setting-key", g_strdup(option.key), g_free);
-    g_signal_connect(row, "notify::active", G_CALLBACK(on_switch_notify), nullptr);
+    wetypex_switch_row_connect_active_notify(row, G_CALLBACK(on_switch_notify));
     adw_expander_row_add_row(ADW_EXPANDER_ROW(expander), row);
   }
 }
@@ -750,7 +750,7 @@ GtkWidget *sync_switch_row(const char *title, const char *subtitle, bool value, 
   adw_switch_row_set_active(ADW_SWITCH_ROW(row), value);
   if (out_control)
     *out_control = row;
-  g_signal_connect(row, "notify::active", G_CALLBACK(on_sync_switch), nullptr);
+  wetypex_switch_row_connect_active_notify(row, G_CALLBACK(on_sync_switch));
   return row;
 }
 
